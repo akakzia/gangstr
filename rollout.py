@@ -37,10 +37,7 @@ class RolloutWorker:
         self.last_episode = None
         self.last_obs = self.env.unwrapped.reset_goal(goal=np.array([None]), biased_init=biased_init)
         self.dijkstra_to_goal = None
-        if self.args.ablation == 1:
-            self.state = 'Explore'
-        else:
-            self.state = 'GoToFrontier'
+        self.state ='GoToFrontier'
     
     def test_rollout(self,goals,agent_network:AgentNetwork,episode_duration, animated=False):
         end_episodes = []
@@ -213,23 +210,18 @@ class TeacherGuidedRolloutWorker(RolloutWorker):
 
     def train_rollout(self,agentNetwork:AgentNetwork,episode_duration,max_episodes=None,time_dict=None, animated=False,biased_init=False):
         all_episodes = []
-        self.reset(biased_init)
-        ablation = self.args.ablation
+
         if np.random.uniform() < self.args.intervention_prob:
             # SP intervenes
-            if ablation == 3:
-                # if mixed, then use the other index
-                ablation = 2 if np.random.uniform() < 0.5 else 0
             while len(all_episodes) < max_episodes:
                 if self.state == 'GoToFrontier':
                     if self.long_term_goal == None :
                         t_i = time.time()
-                        self.long_term_goal = next(iter(agentNetwork.sample_goal_in_frontier(self.current_config,1,
-                                                                                             ablation=ablation)),None) # first element or None
+                        self.long_term_goal = next(iter(agentNetwork.sample_goal_in_frontier(self.current_config,1)),None) # first element or None
                         if time_dict:
                             time_dict['goal_sampler'] += time.time() - t_i
                         # if can't find frontier goal, explore directly
-                        if self.long_term_goal == None or (self.long_term_goal == self.current_config and ablation != 0):
+                        if self.long_term_goal == None or self.long_term_goal == self.current_config:
                             self.state = 'Explore'
                             continue
                     no_noise = np.random.uniform() > self.exploration_noise_prob
@@ -240,21 +232,12 @@ class TeacherGuidedRolloutWorker(RolloutWorker):
                     success = episodes[-1]['success'][-1]
                     if success == False: # reset at the first failure
                         self.reset(biased_init)
-                    elif success and self.current_config == self.long_term_goal and ablation != 0:
+                    elif success and self.current_config == self.long_term_goal:
                         self.state = 'Explore'
-                    else:
-                        self.reset(biased_init)
 
                 elif self.state =='Explore':
                     t_i = time.time()
-                    if self.args.ablation == 1:
-                        # Sample randomly a goal in frontier
-                        # From there, sample a new goal outside
-                        last_ag = next(iter(agentNetwork.sample_goal_in_frontier(self.current_config,1)),None)
-                        if last_ag is None:
-                            last_ag = tuple(self.last_obs['achieved_goal_binary'])
-                    else:
-                        last_ag = tuple(self.last_obs['achieved_goal_binary'])
+                    last_ag = tuple(self.last_obs['achieved_goal_binary'])
                     explore_goal = next(iter(agentNetwork.sample_from_frontier(last_ag,1)),None) # first element or None
                     if time_dict !=None:
                         time_dict['goal_sampler'] += time.time() - t_i
@@ -266,18 +249,14 @@ class TeacherGuidedRolloutWorker(RolloutWorker):
                         episode = self.generate_one_rollout(explore_goal, goal_dist, False, episode_duration,animated=animated)
                         all_episodes.append(episode)
                         success = episode['success'][-1]
-                    if explore_goal == None or (not success and ablation != 1):
+                    if explore_goal == None or  success == False:
                             self.reset(biased_init)
                             continue
-                    elif ablation == 1 and not success:
-                        while not success and len(all_episodes) < max_episodes:
-                            episode = self.generate_one_rollout(explore_goal, goal_dist, False, episode_duration, animated=animated)
-                            all_episodes.append(episode)
-                            success = episode['success'][-1]
                 else :
                     raise Exception(f"unknown state : {self.state}")
         else:
             # No SP intervention
+            self.reset(biased_init)
             while len(all_episodes) < max_episodes:
                 # If no SP intervention
                 t_i = time.time()

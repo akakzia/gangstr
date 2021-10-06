@@ -93,8 +93,8 @@ class AgentNetwork():
         else :
             return random.choices(self.semantic_graph.configs.inverse,k=nb_goal)
 
-    def sample_goal_in_frontier(self,current_node,k, ablation=5):
-        return self.teacher.sample_in_frontier(current_node,self.semantic_graph,k, ablation=ablation)
+    def sample_goal_in_frontier(self,current_node,k):
+        return self.teacher.sample_in_frontier(current_node,self.semantic_graph,k)
     
     def sample_from_frontier(self,frontier_node,k):
         return self.teacher.sample_from_frontier(frontier_node,self.semantic_graph,k)
@@ -154,8 +154,6 @@ class AgentNetwork():
         self.semantic_graph.log(logger)
         # TODO : , à change selon qu'on soit unordered ou pas. 
         logger.record_tabular('frontier_len',len(self.teacher.agent_frontier))
-        logger.record_tabular('stepping_stones_len', len(self.teacher.agent_stepping_stones))
-        logger.record_tabular('terminal_len', len(self.teacher.agent_frontier_not_stepping_stones))
 
     def save(self,model_path, epoch):
         self.semantic_graph.save(model_path+'/',f'{epoch}')

@@ -89,8 +89,6 @@ def get_args():
 
     parser.add_argument('--exploration-noise-prob', type=float, default=1., help='When going to frontier, apply noise at ratio')
 
-    parser.add_argument('--ablation', type=int, default=5, help='id of ablation to be considered')
-
     args = parser.parse_args()
 
     return args
