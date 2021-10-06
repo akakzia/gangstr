@@ -46,6 +46,7 @@ def launch(args):
     random.seed(args.seed + MPI.COMM_WORLD.Get_rank())
     np.random.seed(args.seed + MPI.COMM_WORLD.Get_rank())
     torch.manual_seed(args.seed + MPI.COMM_WORLD.Get_rank())
+
     if args.cuda:
         torch.cuda.manual_seed(args.seed + MPI.COMM_WORLD.Get_rank())
 
@@ -68,25 +69,21 @@ def launch(args):
         raise NotImplementedError
 
     # Initialize Rollout Worker
-    if args.rollout_goal_generator == 'teacher':
-        rollout_worker = TeacherGuidedRolloutWorker(env, policy, goal_sampler,  args)
-    elif args.rollout_goal_generator == 'neighbour':
-        rollout_worker = NeighbourRolloutWorker(env, policy, goal_sampler,  args)
-    elif args.rollout_goal_generator == 'known_unif':
-        rollout_worker = GANGSTR_RolloutWorker(env, policy, goal_sampler,  args)
+    rollout_worker = TeacherGuidedRolloutWorker(env, policy, goal_sampler,  args)
 
-    # create graph if necessary
+    # If non existent, create expert knowledge graph
     if rank == 0 and not os.path.isdir('data'):
         generate_expert_graph(args.n_blocks,True)
+
     MPI.COMM_WORLD.Barrier()
     # initialize graph components : 
-    sem_op = SemanticOperation(args.n_blocks,True)
-    configs = bidict()
+    # sem_op = SemanticOperation(args.n_blocks,True)
+    # configs = bidict()
     nk_graph = nk.Graph(0,weighted=True, directed=True)
     if args.unordered_edge:
-        semantic_graph = UnorderedSemanticGraph(configs,nk_graph,args.n_blocks,True,args=args)
-    else : 
-        semantic_graph = SemanticGraph(configs,nk_graph,args.n_blocks,True,args=args)
+        semantic_graph = UnorderedSemanticGraph(bidict(),nk_graph,args.n_blocks,True,args=args)
+    else :
+        semantic_graph = SemanticGraph(bidict(),nk_graph,args.n_blocks,True,args=args)
     agent_network = AgentNetwork(semantic_graph,logdir,args)
     agent_network.teacher.computeFrontier(agent_network.semantic_graph)
 
@@ -149,9 +146,7 @@ def launch(args):
             # Performing evaluations
             t_i = time.time()
             eval_goals = []
-            if args.n_blocks == 3:
-                instructions = ['close_1', 'close_2', 'close_3', 'stack_2', 'pyramid_3', 'stack_3']
-            elif args.n_blocks == 5:
+            if args.n_blocks == 5:
                 instructions = ['close_1', 'close_2', 'close_3', 'stack_2', 'stack_3', '2stacks_2_2', '2stacks_2_3', 'pyramid_3',
                                 'mixed_2_3', 'stack_4', 'stack_5']
             else:
@@ -160,7 +155,6 @@ def launch(args):
                 eval_goal = get_eval_goals(instruction, n=args.n_blocks)
                 eval_goals.append(eval_goal.squeeze(0))
             eval_goals = np.array(eval_goals)
-            eval_masks = np.array(np.zeros((eval_goals.shape[0], args.n_blocks * (args.n_blocks - 1) * 3 // 2)))
             episodes = rollout_worker.test_rollout(eval_goals,agent_network,
                                                         episode_duration=args.episode_duration,
                                                         animated=False)
@@ -173,8 +167,6 @@ def launch(args):
 
             # synchronize goals count per class in teacher
             synchronized_stats = sync(agent_network.teacher.stats)
-            # synchronize agent's achieved goals classes
-            # synchronized_agent_stats = sync(agent_network.stats)
 
             # Logs
             if rank == 0:
