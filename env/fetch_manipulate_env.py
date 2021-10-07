@@ -241,27 +241,15 @@ class FetchManipulateEnv(robot_env.RobotEnv):
             ])
 
         objects_positions = objects_positions.reshape(self.num_blocks, 3)
-        object_combinations = itertools.combinations(objects_positions, 2)
-        object_rel_distances = np.array([objects_distance(obj[0], obj[1]) for obj in object_combinations])
         
         achieved_goal = self._get_configuration(objects_positions)
 
         achieved_goal = np.squeeze(achieved_goal)
 
-        # Reflect achieved goal in goal according to mask
-        # if self.mask is not None:
-        #     desired_goal = achieved_goal * self.mask + self.target_goal * (1 - self.mask)
-        # else:
-        #     desired_goal = self.target_goal.copy()
-        #
-        # desired_goal = np.squeeze(desired_goal)
-
         return {
             'observation': obs.copy(),
             'achieved_goal': achieved_goal.copy(),
-            'desired_goal': self.target_goal.copy(),
-            'achieved_goal_binary': achieved_goal.copy(),
-            'desired_goal_binary': self.target_goal.copy()}
+            'desired_goal': self.target_goal.copy()}
 
     def _viewer_setup(self):
         body_id = self.sim.model.body_name2id('robot0:gripper_link')

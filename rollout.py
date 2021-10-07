@@ -19,7 +19,7 @@ class RolloutWorker:
 
     @property
     def current_config(self):
-        return tuple(self.last_obs['achieved_goal_binary'])
+        return tuple(self.last_obs['achieved_goal'])
 
     def reset(self,biased_init):
         self.long_term_goal = None
@@ -85,10 +85,8 @@ class RolloutWorker:
         self.env.unwrapped.binary_goal = np.array(goal)
         obs = self.last_obs['observation']
         ag = self.last_obs['achieved_goal']
-        ag_bin = self.last_obs['achieved_goal_binary']
-        g_bin = self.last_obs['desired_goal_binary']
 
-        ep_obs, ep_ag, ep_ag_bin, ep_g, ep_g_bin, ep_actions, ep_success, ep_rewards = [], [], [], [], [], [], [], []
+        ep_obs, ep_ag, ep_g, ep_actions, ep_success, ep_rewards = [], [], [], [], [], []
         # Start to collect samples
         for _ in range(episode_duration):
             # Run policy for one step
@@ -103,14 +101,11 @@ class RolloutWorker:
             observation_new, r, _, _ = self.env.step(action)
             obs_new = observation_new['observation']
             ag_new = observation_new['achieved_goal']
-            ag_new_bin = observation_new['achieved_goal_binary']
 
             # Append rollouts
             ep_obs.append(obs.copy())
             ep_ag.append(ag.copy())
-            ep_ag_bin.append(ag_bin.copy())
             ep_g.append(g.copy())
-            ep_g_bin.append(g_bin.copy())
             ep_actions.append(action.copy())
             ep_rewards.append(r)
             ep_success.append((ag_new == g).all())
@@ -118,11 +113,9 @@ class RolloutWorker:
             # Re-assign the observation
             obs = obs_new
             ag = ag_new
-            ag_bin = ag_new_bin
 
         ep_obs.append(obs.copy())
         ep_ag.append(ag.copy())
-        ep_ag_bin.append(ag_bin.copy())
 
         # Gather everything
         episode = dict(obs=np.array(ep_obs).copy(),
@@ -130,8 +123,6 @@ class RolloutWorker:
                         g=np.array(ep_g).copy(),
                         ag=np.array(ep_ag).copy(),
                         success=np.array(ep_success).copy(),
-                        g_binary=np.array(ep_g_bin).copy(),
-                        ag_binary=np.array(ep_ag_bin).copy(),
                         rewards=np.array(ep_rewards).copy(),
                         self_eval=evaluation)
 
@@ -222,7 +213,7 @@ class TeacherGuidedRolloutWorker(RolloutWorker):
 
                 elif self.state =='Explore':
                     t_i = time.time()
-                    last_ag = tuple(self.last_obs['achieved_goal_binary'])
+                    last_ag = tuple(self.last_obs['achieved_goal'])
                     explore_goal = next(iter(agentNetwork.sample_from_frontier(last_ag,1)),None) # first element or None
                     if time_dict !=None:
                         time_dict['goal_sampler'] += time.time() - t_i

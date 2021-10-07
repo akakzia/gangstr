@@ -1,15 +1,6 @@
-from collections import deque
 import numpy as np
 from utils import get_idxs_per_relation
 from mpi4py import MPI
-import os
-import pickle
-import pandas as pd
-from mpi_utils import logger
-
-
-ALL_MASKS = True
-
 
 class GoalSampler:
     def __init__(self, args):
@@ -62,56 +53,13 @@ class GoalSampler:
 
             for e in all_episode_list:
                 # Add last achieved goal to memory if first time encountered
-                if str(e['ag_binary'][-1]) not in self.discovered_goals_str:
-                    self.discovered_goals.append(e['ag_binary'][-1].copy())
-                    self.discovered_goals_str.append(str(e['ag_binary'][-1]))
+                if str(e['ag'][-1]) not in self.discovered_goals_str:
+                    self.discovered_goals.append(e['ag'][-1].copy())
+                    self.discovered_goals_str.append(str(e['ag'][-1]))
 
         self.sync()
 
-        # Apply masks
-        for e in episodes:
-            if self.mask_application == 'hindsight':
-                e['g'] = e['g'] * (1 - e['masks'][0]) + e['ag'][:-1] * e['masks'][0]
-            elif self.mask_application == 'initial':
-                e['g'] = e['g'] * (1 - e['masks'][0]) + e['ag'][0] * e['masks'][0]
-            elif self.mask_application == 'opaque':
-                e['g'] = e['g'] * (1 - e['masks'][0]) - 10 * e['masks'][0]
-            else:
-                raise NotImplementedError
-
         return episodes
-
-    def generate_eval_goals(self):
-        """ Generates a set of goals for evaluation. This set comprises :
-        - One relation with close == True .
-        - One relation with above == True
-        - Two relations with close == True in one of them
-        - Two relations with close == True in both of them
-        - Two relations with above == True in one and close == False in the other
-        - Two relations with above == True in one and close == True in the other
-        - Two relations with above == True in one and above == True in the other
-        - Three whole relations for the 7 above cases"""
-        if self.use_masks:
-            masks = np.array([np.array([0, 1, 1, 0, 1, 0, 1, 1, 1]), np.array([0, 1, 1, 0, 1, 0, 1, 1, 1]),
-                              np.array([0, 0, 1, 0, 0, 0, 1, 0, 1]), np.array([0, 0, 1, 0, 0, 0, 1, 0, 1]),
-                              np.array([0, 0, 1, 0, 0, 0, 1, 0, 1]), np.array([0, 0, 1, 0, 0, 0, 1, 0, 1]),
-                              np.array([0, 1, 0, 0, 1, 0, 0, 1, 0]),
-                              np.zeros(9), np.zeros(9), np.zeros(9), np.zeros(9), np.zeros(9)])
-        else:
-            masks = np.zeros((12, 9))
-        gs = np.array([np.array([1., -10., -10., -1., -10., -1., -10., -10., -10.]), np.array([1., -10., -10., 1., -10., -1., -10., -10., -10.]),
-
-                       np.array([1., -1., -10., -1., -1., -1., -10., -1., -10.]), np.array([1., 1., -10., -1., -1., -1., -10., -1., -10.]),
-                       np.array([1., -1., -10., -1., -1., 1., -10., -1., -10.]), np.array([1., 1., -10., -1., 1., -1., -10., -1., -10.]),
-                       np.array([1., -10., 1., 1., -10., -1., 1., -10., -1.]),
-
-                       np.array([1., -1., -1., -1., -1., -1., -1., -1., -1.]), np.array([1., -1., -1., 1., -1., -1., -1., -1., -1.]),
-
-                       np.array([1., 1., -1., -1., -1., -1., -1., -1., -1.]),
-                       np.array([1., 1., 1., -1., -1., 1., -1., -1., -1.]),
-                       np.array([1., -1., 1., 1., -1., -1., 1., -1., -1.])
-                       ])
-        return gs, masks
 
     def sync(self):
         self.discovered_goals = MPI.COMM_WORLD.bcast(self.discovered_goals, root=0)
