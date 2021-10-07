@@ -8,7 +8,7 @@ from arguments import get_args
 from rl_modules.rl_agent import RLAgent
 import random
 import torch
-from rollout import TeacherGuidedRolloutWorker,NeighbourRolloutWorker,GANGSTR_RolloutWorker
+from rollout import TeacherGuidedRolloutWorker
 from goal_sampler import GoalSampler
 from utils import init_storage, get_eval_goals
 import time
@@ -52,7 +52,7 @@ def launch(args):
 
     # get saving paths
     logdir = None
-    if rank == 0:
+    if rank == 0 and args.evaluations:
         logdir, model_path = init_storage(args)
         logger.configure(dir=logdir)
         logger.info(vars(args))

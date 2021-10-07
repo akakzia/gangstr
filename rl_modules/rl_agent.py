@@ -6,7 +6,6 @@ from rl_modules.networks import QNetworkFlat, GaussianPolicyFlat
 from mpi_utils.normalizer import normalizer
 from her_modules.her import her_sampler
 from updates import update_flat, update_deepsets
-from utils import id_to_language
 
 
 """
@@ -20,7 +19,6 @@ def hard_update(target, source):
 
 class RLAgent:
     def __init__(self, args, compute_rew, goal_sampler):
-
         self.args = args
         self.alpha = args.alpha
         self.env_params = args.env_params
@@ -71,10 +69,7 @@ class RLAgent:
             self.critic_optim = torch.optim.Adam(list(self.model.critic.parameters()),
                                                  lr=self.args.lr_critic)
         elif self.architecture == 'gnn':
-            if self.args.variant == 2:
-                from rl_modules.gnn_models_v2 import GnnSemantic
-            else:
-                from rl_modules.gnn_models import GnnSemantic
+            from rl_modules.gnn_models import GnnSemantic
             self.model = GnnSemantic(self.env_params, args)
             # sync the networks across the CPUs
             sync_networks(self.model.critic)
@@ -122,43 +117,23 @@ class RLAgent:
         self.buffer = EdgeBuffer(env_params=self.env_params,
                                   buffer_size=self.args.buffer_size,
                                   sample_func=self.her_module.sample_her_transitions,
-                                  replay_sampling=self.args.replay_sampling ,
                                   goal_sampler=self.goal_sampler,
                                   args=args)
 
-    def act(self, obs, ag, g, mask, no_noise, language_goal=None):
-        # apply mask
-        if mask is not None:
-            if self.args.mask_application == 'hindsight':
-                g = g * (1 - mask) + ag * mask
-            elif self.args.mask_application == 'initial':
-                g = g * (1 - mask) + ag * mask
-            elif self.args.mask_application == 'opaque':
-                g = g * (1 - mask) - 10 * mask
-            else:
-                raise NotImplementedError
+    def act(self, obs, ag, g, no_noise):
         with torch.no_grad():
             # normalize policy inputs
             obs_norm = self.o_norm.normalize(obs)
             ag_norm = torch.tensor(self.g_norm.normalize(ag), dtype=torch.float32).unsqueeze(0)
 
-            if self.language:
-                g_norm = g
-            else:
-                g_norm = torch.tensor(self.g_norm.normalize(g), dtype=torch.float32).unsqueeze(0)
+            g_norm = torch.tensor(self.g_norm.normalize(g), dtype=torch.float32).unsqueeze(0)
+
             if self.architecture == 'gnn':
                 obs_tensor = torch.tensor(obs_norm, dtype=torch.float32).unsqueeze(0)
-                if self.args.algo == 'language':
-                    self.model.policy_forward_pass(obs_tensor, no_noise=no_noise, language_goal=language_goal)
-                elif self.args.algo == 'continuous':
-                    self.model.policy_forward_pass(obs_tensor, ag_norm, g_norm, no_noise=no_noise)
-                else:
-                    self.model.policy_forward_pass(obs_tensor, ag_norm, g_norm, no_noise=no_noise)
+                self.model.policy_forward_pass(obs_tensor, ag_norm, g_norm, no_noise=no_noise)
                 action = self.model.pi_tensor.numpy()[0]
-
             else:
-                input_tensor = self._preproc_inputs(obs, ag, g)
-                action = self._select_actions(input_tensor, no_noise=no_noise)
+                raise NotImplementedError
 
         return action.copy()
     
@@ -187,7 +162,7 @@ class RLAgent:
             if self.architecture == 'gnn':
                 self._soft_update_target_network(self.model.critic_target, self.model.critic)
             else:
-                self._soft_update_target_network(self.critic_target_network, self.critic_network)
+                raise NotImplementedError
 
     def _select_actions(self, state, no_noise=False):
         if not no_noise:
@@ -202,7 +177,6 @@ class RLAgent:
         mb_obs = episode['obs']
         mb_ag = episode['ag']
         mb_g = episode['g']
-        mb_masks = episode['masks']
         mb_actions = episode['act']
         mb_obs_next = mb_obs[1:, :]
         mb_ag_next = mb_ag[1:, :]
@@ -212,15 +186,10 @@ class RLAgent:
         buffer_temp = {'obs': np.expand_dims(mb_obs, 0),
                        'ag': np.expand_dims(mb_ag, 0),
                        'g': np.expand_dims(mb_g, 0),
-                       'masks': np.expand_dims(mb_masks, 0),
                        'actions': np.expand_dims(mb_actions, 0),
                        'obs_next': np.expand_dims(mb_obs_next, 0),
                        'ag_next': np.expand_dims(mb_ag_next, 0),
                        }
-        # if 'language_goal' in episode.keys():
-        #     buffer_temp['language_goal'] = np.array([episode['language_goal'] for _ in range(mb_g.shape[0])], dtype='object').reshape(1, -1)
-        if 'lg_ids' in episode.keys():
-            buffer_temp['lg_ids'] = np.expand_dims(episode['lg_ids'], 0)
 
         transitions = self.her_module.sample_her_transitions(buffer_temp, num_transitions)
         obs, g = transitions['obs'], transitions['g']

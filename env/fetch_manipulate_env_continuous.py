@@ -3,7 +3,6 @@ import os
 import itertools
 
 from env import rotations, robot_env, utils
-from utils import generate_goals
 
 
 def goal_distance(goal_a, goal_b):

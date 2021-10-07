@@ -15,45 +15,14 @@ class GoalSampler:
     def __init__(self, args):
         self.num_rollouts_per_mpi = args.num_rollouts_per_mpi
         self.rank = MPI.COMM_WORLD.Get_rank()
-        self.use_masks = args.masks
-        self.mask_application = args.mask_application
 
         self.goal_dim = args.env_params['goal']
         self.relation_ids = get_idxs_per_relation(n=args.n_blocks)
-        # if ALL_MASKS:
-        #     self.masks_list = [np.array([1, 0, 0, 1, 0, 1, 0, 0, 0]), np.array([0, 1, 0, 0, 1, 0, 0, 1, 0]),
-        #                        np.array([0, 0, 1, 0, 0, 0, 1, 0, 1]),
-        #                        np.array([1, 1, 0, 1, 1, 1, 0, 1, 0]), np.array([1, 0, 1, 1, 0, 1, 1, 0, 1]),
-        #                        np.array([0, 1, 1, 0, 1, 0, 1, 1, 1]),
-        #                        np.array([0, 0, 0, 0, 0, 0, 0, 0, 0])]
-        # # Test only simple masks in training
-        # else:
-        #     self.masks_list = [np.array([1, 1, 0, 1, 1, 1, 1, 0, 0]), np.array([1, 0, 1, 1, 1, 0, 0, 1, 1]),
-        #                        np.array([0, 1, 1, 0, 0, 1, 1, 1, 1])]
-
-        # self.n_masks = len(self.masks_list)
 
         self.discovered_goals = []
         self.discovered_goals_str = []
 
         self.init_stats()
-
-    def sample_masks(self, n):
-        """Samples n masks uniformly"""
-        if not self.use_masks:
-            # No masks
-            return np.zeros((n, self.goal_dim))
-        masks = np.zeros((n, self.goal_dim))
-        # Select number of masks to apply per goal
-        n_masks = np.random.randint(self.relation_ids.shape[0], size=n)
-        # Get idxs to be masked
-        relations_to_mask = [np.random.choice(np.arange(self.relation_ids.shape[0]), size=i, replace=False) for i in n_masks]
-        re = [np.concatenate(self.relation_ids[r]) if self.relation_ids[r].shape[0] > 0 else None for r in relations_to_mask]
-        # apply masks
-        for mask, ids_to_mask in zip(masks, re):
-            if ids_to_mask is not None:
-                mask[ids_to_mask] = 1
-        return masks
 
     def sample_goal(self, n_goals, evaluation):
         """

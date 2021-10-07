@@ -2,27 +2,18 @@ import random
 from graph.agent_network import AgentNetwork
 import numpy as np
 from graph.SemanticOperation import SemanticOperation, config_to_name,config_to_unique_str
-import time 
-
-def is_success(ag, g, mask=None):
-    if mask is None:
-        return (ag == g).all()
-    else:
-        ids = np.where(mask != 1.)[0]
-        return (ag[ids] == g[ids]).all()
+import time
 
 class RolloutWorker:
     def __init__(self, env, policy, goal_sampler, args):
         self.env = env
         self.policy = policy
         self.env_params = args.env_params
-        self.biased_init = args.biased_init
         self.goal_sampler = goal_sampler
         self.goal_dim = args.env_params['goal']
         self.args = args
         self.last_obs = None
         self.reset(False)
-        self.relabel_episodes = args.relabel_episodes
 
         self.exploration_noise_prob = args.exploration_noise_prob
 
@@ -69,8 +60,7 @@ class RolloutWorker:
             if animated:
                 print(f'\t{self.current_goal_id} : \n{config_to_unique_str(self.current_config,sem_op)} ->  {config_to_unique_str(current_goal,sem_op)}'  )
                 
-            episode = self.generate_one_rollout(current_goal,goal_dist, 
-                                                evaluation, episode_duration, animated=False)
+            episode = self.generate_one_rollout(current_goal, evaluation, episode_duration, animated=False)
             episodes.append(episode)
             self.current_goal_id+=1
             
@@ -88,7 +78,7 @@ class RolloutWorker:
 
         return episodes,self.last_episode
 
-    def generate_one_rollout(self, goal,goal_dist, evaluation, episode_duration, animated=False):    
+    def generate_one_rollout(self, goal,evaluation, episode_duration, animated=False):
 
         g = np.array(goal)
         self.env.unwrapped.target_goal = np.array(goal)
@@ -97,16 +87,14 @@ class RolloutWorker:
         ag = self.last_obs['achieved_goal']
         ag_bin = self.last_obs['achieved_goal_binary']
         g_bin = self.last_obs['desired_goal_binary']
-        empty_mask = np.zeros(len(goal))
 
         ep_obs, ep_ag, ep_ag_bin, ep_g, ep_g_bin, ep_actions, ep_success, ep_rewards = [], [], [], [], [], [], [], []
-        ep_masks = []
         # Start to collect samples
         for _ in range(episode_duration):
             # Run policy for one step
             no_noise = evaluation  # do not use exploration noise if running self-evaluations or offline evaluations
             # feed both the observation and mask to the policy module
-            action = self.policy.act(obs.copy(), ag.copy(), g.copy(), empty_mask.copy(), no_noise, language_goal=False)
+            action = self.policy.act(obs.copy(), ag.copy(), g.copy(), no_noise)
 
             # feed the actions into the environment
             if animated:
@@ -125,8 +113,7 @@ class RolloutWorker:
             ep_g_bin.append(g_bin.copy())
             ep_actions.append(action.copy())
             ep_rewards.append(r)
-            ep_success.append(is_success(ag_new, g, empty_mask))
-            ep_masks.append(np.array(empty_mask).copy())
+            ep_success.append((ag_new == g).all())
 
             # Re-assign the observation
             obs = obs_new
@@ -146,8 +133,6 @@ class RolloutWorker:
                         g_binary=np.array(ep_g_bin).copy(),
                         ag_binary=np.array(ep_ag_bin).copy(),
                         rewards=np.array(ep_rewards).copy(),
-                        masks=np.array(ep_masks).copy(),
-                        edge_dist=goal_dist,
                         self_eval=evaluation)
 
         self.last_obs = observation_new
@@ -230,7 +215,7 @@ class TeacherGuidedRolloutWorker(RolloutWorker):
                     all_episodes += episodes
 
                     success = episodes[-1]['success'][-1]
-                    if success == False: # reset at the first failure
+                    if not success: # reset at the first failure
                         self.reset(biased_init)
                     elif success and self.current_config == self.long_term_goal:
                         self.state = 'Explore'
@@ -242,11 +227,7 @@ class TeacherGuidedRolloutWorker(RolloutWorker):
                     if time_dict !=None:
                         time_dict['goal_sampler'] += time.time() - t_i
                     if explore_goal:
-                        if self.last_episode:
-                            goal_dist = self.last_episode["edge_dist"]+1
-                        else :
-                            goal_dist = 1
-                        episode = self.generate_one_rollout(explore_goal, goal_dist, False, episode_duration,animated=animated)
+                        episode = self.generate_one_rollout(explore_goal, False, episode_duration,animated=animated)
                         all_episodes.append(episode)
                         success = episode['success'][-1]
                     if explore_goal == None or  success == False:
@@ -278,66 +259,3 @@ class TeacherGuidedRolloutWorker(RolloutWorker):
                 all_episodes += new_episodes
                 self.reset(biased_init)
         return all_episodes
-
-    
-
-class NeighbourRolloutWorker(RolloutWorker):
-    def __init__(self, env, policy, goal_sampler, args):
-        super().__init__(env, policy, goal_sampler, args)
-    
-    def generate_goal(self,agentNetwork: AgentNetwork):
-        neighbors = list(agentNetwork.teacher.oracle_graph.iterNeighbors(self.current_config))
-        if neighbors:
-            return random.choice(neighbors)
-        else : 
-            return agentNetwork.sample_goal_uniform(1)[0]
-
-    def train_rollout(self, agentNetwork: AgentNetwork, episode_duration,max_episodes=None,time_dict=None, animated=False,biased_init=False):
-        episodes = []
-        for i in range(max_episodes):
-            t_i = time.time()
-
-            next_goal = self.generate_goal(agentNetwork)
-            if time_dict !=None:
-                time_dict['goal_sampler'] += time.time() - t_i
-
-            episode = self.generate_one_rollout(next_goal,goal_dist=i,evaluation=False,
-                                                episode_duration=episode_duration, animated=animated)
-            episodes.append(episode)
-
-            invalid_state = self.env.cube_under_table()
-            if invalid_state:
-                self.reset(biased_init)
-        return episodes
-
-class GANGSTR_RolloutWorker(RolloutWorker):
-    
-    def __init__(self, env, policy, goal_sampler, args):
-        super().__init__(env, policy, goal_sampler, args)
-        # self.goal_dim = args.env_params['goal']
-
-    def train_rollout(self, agentNetwork: AgentNetwork, episode_duration,max_episodes=None,time_dict=None, animated=False,biased_init=False):
-        episodes = []
-        while len(episodes) < max_episodes:
-            t_i = time.time()
-            if len(agentNetwork.semantic_graph.configs) > 0:
-                next_goal = agentNetwork.sample_goal_uniform(1, use_oracle=False)[0]
-            else:
-                next_goal = tuple(np.random.choice([-1., 1.], size=(1, self.goal_dim))[0]) 
-
-            if time_dict !=None:
-                time_dict['goal_sampler'] += time.time() - t_i
-            if (agentNetwork.semantic_graph.hasNode(next_goal) 
-                and agentNetwork.semantic_graph.hasNode(self.current_config)
-                and next_goal != self.current_config):
-                new_episodes,_ = self.guided_rollout(next_goal,evaluation=False,
-                                agent_network=agentNetwork,episode_duration=episode_duration,episode_budget=max_episodes-len(episodes))
-            else : 
-                new_episodes = [self.generate_one_rollout(next_goal,1,False,episode_duration,animated)]
-            if len(new_episodes) > 1 and self.relabel_episodes:
-                final_goal = new_episodes[-1]['g'][-1]
-                for i in range(len(new_episodes) - 1):
-                    new_episodes[i]['g'] = np.repeat(final_goal.reshape(1, final_goal.shape[0]), new_episodes[i]['g'].shape[0], axis=0)
-            episodes+= new_episodes
-            self.reset(biased_init)
-        return episodes
