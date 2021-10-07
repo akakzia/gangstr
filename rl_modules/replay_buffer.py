@@ -1,11 +1,9 @@
-
 from collections import defaultdict
 import threading
 import numpy as np
 import random
-from graph.SemanticOperation import SemanticOperation,config_to_unique_str
 
-class EdgeBuffer:
+class ReplayBuffer:
     def __init__(self, env_params, buffer_size, sample_func, goal_sampler,args):
         self.env_params = env_params
         self.T = args.episode_duration
@@ -26,7 +24,6 @@ class EdgeBuffer:
         self.all_edges = []
         # thread lock
         self.lock = threading.Lock()
-
 
     # store the episode
     def store_episode(self, episode_batch):
