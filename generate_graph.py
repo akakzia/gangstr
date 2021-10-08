@@ -1,13 +1,8 @@
 import os
-import time
-from graph.SemanticOperation import SemanticOperation
 from graph.connect4_3d_Simulator import EnvSimulatorSimplified,generate_unordered_tree_from_start
 from graph.semantic_graph import SemanticGraph,augment_with_all_permutation
-import networkit as nk
-import matplotlib.pyplot as plt
-import time
+
 from graph.SemanticOperation import SemanticOperation
-import networkit as nk
 
 PATH = 'data/'
 

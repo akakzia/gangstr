@@ -8,7 +8,7 @@ from arguments import get_args
 from rl_modules.rl_agent import RLAgent
 import random
 import torch
-from rollout import TeacherGuidedRolloutWorker
+from rollout import HMERolloutWorker
 from goal_sampler import GoalSampler
 from utils import init_storage, get_eval_goals
 import time
@@ -17,7 +17,6 @@ import networkit as nk
 from graph.semantic_graph import SemanticGraph
 from graph.UnorderedSemanticGraph import UnorderedSemanticGraph
 from graph.agent_network import AgentNetwork
-from graph.SemanticOperation import SemanticOperation
 from generate_graph import generate_expert_graph
 import env
 
@@ -69,7 +68,7 @@ def launch(args):
         raise NotImplementedError
 
     # Initialize Rollout Worker
-    rollout_worker = TeacherGuidedRolloutWorker(env, policy, goal_sampler,  args)
+    rollout_worker = HMERolloutWorker(env, policy, goal_sampler,  args)
 
     # If non existent, create expert knowledge graph
     if rank == 0 and not os.path.isdir('data'):
@@ -103,10 +102,9 @@ def launch(args):
 
             # Environment interactions
             t_i = time.time()
-            episodes = rollout_worker.train_rollout(agentNetwork= agent_network, 
-                                                    max_episodes=args.num_rollouts_per_mpi,
-                                                    episode_duration=args.episode_duration,
+            episodes = rollout_worker.train_rollout(agent_network= agent_network,
                                                     time_dict=time_dict)
+
             time_dict['rollout'] += time.time() - t_i
 
             # Goal Sampler updates
