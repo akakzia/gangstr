@@ -19,7 +19,7 @@ def update_entropy(alpha, log_alpha, target_entropy, log_pi, alpha_optim, args):
 
     return alpha, alpha_loss, alpha_tlogs
 
-def update_gnn(model, policy_optim, critic_optim, alpha, log_alpha, target_entropy, alpha_optim, obs_norm, ag_norm, g_norm,
+def update_networks(model, policy_optim, critic_optim, alpha, log_alpha, target_entropy, alpha_optim, obs_norm, ag_norm, g_norm,
                     obs_next_norm, ag_next_norm, actions, rewards, args):
     # Tensorize
     obs_norm_tensor = torch.tensor(obs_norm, dtype=torch.float32)

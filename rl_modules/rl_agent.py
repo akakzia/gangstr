@@ -4,7 +4,7 @@ from mpi_utils.mpi_utils import sync_networks
 from rl_modules.replay_buffer import ReplayBuffer
 from mpi_utils.normalizer import normalizer
 from her_modules.her import her_sampler
-from updates import update_gnn
+from updates import update_networks
 
 
 """
@@ -34,20 +34,22 @@ class RLAgent:
         if self.architecture == 'gnn':
             from rl_modules.gnn_models import GnnSemantic
             self.model = GnnSemantic(self.env_params, args)
-            # sync the networks across the CPUs
-            sync_networks(self.model.critic)
-            sync_networks(self.model.actor)
-            hard_update(self.model.critic_target, self.model.critic)
-            sync_networks(self.model.critic_target)
-
-            # create the optimizer
-            self.policy_optim = torch.optim.Adam(list(self.model.actor.parameters()),
-                                                 lr=self.args.lr_actor)
-            self.critic_optim = torch.optim.Adam(list(self.model.critic.parameters()),
-                                                 lr=self.args.lr_critic)
-
+        elif self.architecture == 'deep_sets':
+            from rl_modules.deepsets_models import DeepSetSemantic
+            self.model = DeepSetSemantic(self.env_params, args)
         else:
             raise NotImplementedError
+        # sync the networks across the CPUs
+        sync_networks(self.model.critic)
+        sync_networks(self.model.actor)
+        hard_update(self.model.critic_target, self.model.critic)
+        sync_networks(self.model.critic_target)
+
+        # create the optimizer
+        self.policy_optim = torch.optim.Adam(list(self.model.actor.parameters()),
+                                             lr=self.args.lr_actor)
+        self.critic_optim = torch.optim.Adam(list(self.model.critic.parameters()),
+                                             lr=self.args.lr_critic)
 
         # create the normalizer
         self.o_norm = normalizer(size=self.env_params['obs'], default_clip_range=self.args.clip_range)
@@ -82,12 +84,9 @@ class RLAgent:
 
             g_norm = torch.tensor(self.g_norm.normalize(g), dtype=torch.float32).unsqueeze(0)
 
-            if self.architecture == 'gnn':
-                obs_tensor = torch.tensor(obs_norm, dtype=torch.float32).unsqueeze(0)
-                self.model.policy_forward_pass(obs_tensor, ag_norm, g_norm, no_noise=no_noise)
-                action = self.model.pi_tensor.numpy()[0]
-            else:
-                raise NotImplementedError
+            obs_tensor = torch.tensor(obs_norm, dtype=torch.float32).unsqueeze(0)
+            self.model.policy_forward_pass(obs_tensor, ag_norm, g_norm, no_noise=no_noise)
+            action = self.model.pi_tensor.numpy()[0]
 
         return action.copy()
     
@@ -113,10 +112,7 @@ class RLAgent:
 
         # soft update
         if self.total_iter % self.freq_target_update == 0:
-            if self.architecture == 'gnn':
-                self._soft_update_target_network(self.model.critic_target, self.model.critic)
-            else:
-                raise NotImplementedError
+            self._soft_update_target_network(self.model.critic_target, self.model.critic)
 
     # update the normalizer
     def _update_normalizer(self, episode):
@@ -180,21 +176,15 @@ class RLAgent:
         obs_next_norm = self.o_norm.normalize(transitions['obs_next'])
         ag_next_norm = self.g_norm.normalize(transitions['ag_next'])
 
-        if self.architecture == 'gnn':
-            self.alpha = update_gnn(self.model, self.policy_optim, self.critic_optim, self.alpha, self.log_alpha,
-                                    self.target_entropy, self.alpha_optim, obs_norm, ag_norm, g_norm, obs_next_norm, ag_next_norm,
-                                    actions, rewards, self.args)
-        else:
-            raise NotImplementedError
+        self.alpha = update_networks(self.model, self.policy_optim, self.critic_optim, self.alpha, self.log_alpha,
+                                     self.target_entropy, self.alpha_optim, obs_norm, ag_norm, g_norm, obs_next_norm, ag_next_norm,
+                                     actions, rewards, self.args)
 
     def save(self, model_path, epoch):
         # Store model
-        if self.args.architecture == 'gnn':
-            torch.save([self.o_norm.mean, self.o_norm.std, self.g_norm.mean, self.g_norm.std,
-                        self.model.actor.state_dict(), self.model.critic.state_dict()],
-                       model_path + '/model_{}.pt'.format(epoch))
-        else:
-            raise NotImplementedError
+        torch.save([self.o_norm.mean, self.o_norm.std, self.g_norm.mean, self.g_norm.std,
+                    self.model.actor.state_dict(), self.model.critic.state_dict()],
+                   model_path + '/model_{}.pt'.format(epoch))
 
     def load(self, model_path):
         o_mean, o_std, g_mean, g_std, actor, critic = torch.load(model_path, map_location=lambda storage, loc: storage)
