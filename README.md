@@ -29,6 +29,12 @@ Link to our website will be available soon with additional illustrations and vid
 
 To reproduce the results, you need a machine with **24** cpus.
 
+**Simulated Social Partner**
+
+The _HME_ interaction protocol relies on a simulated social partner that possesses a model of the agent's learned and learnable skills. 
+We represent this knowledge with a semantic graph of connected configurations. This graph is already generated and available under 
+the _graph/_ folder.
+
 **Training GANGSTR**
 
 | Social Partner Strategy  | ID          |
