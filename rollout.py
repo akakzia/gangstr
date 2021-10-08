@@ -195,7 +195,6 @@ class HMERolloutWorker(RolloutWorker):
         """ Inputs: agent_network and time_dict
         Return a list of episode rollouts by the agent using social goals"""
         all_episodes = []
-
         self.reset()
         while len(all_episodes) < self.max_episodes:
             if self.state == 'GoToFrontier':
@@ -275,7 +274,7 @@ class HMERolloutWorker(RolloutWorker):
             else:
                 new_episodes = [self.generate_one_rollout(self.long_term_goal, False, self.episode_duration)]
             all_episodes += new_episodes
-
+            self.reset()
         return all_episodes
 
     def train_rollout(self, agent_network, time_dict=None):
