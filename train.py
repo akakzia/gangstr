@@ -84,7 +84,7 @@ def launch(args):
     else :
         semantic_graph = SemanticGraph(bidict(),nk_graph,args.n_blocks,True,args=args)
     agent_network = AgentNetwork(semantic_graph,logdir,args)
-    agent_network.teacher.computeFrontier(agent_network.semantic_graph)
+    agent_network.teacher.compute_frontier(agent_network.semantic_graph)
 
     # Main interaction loop
     episode_count = 0

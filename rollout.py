@@ -14,7 +14,7 @@ class RolloutWorker:
 
         self.max_episodes = args.num_rollouts_per_mpi
         self.episode_duration = args.episode_duration
-
+        self.strategy = args.strategy
         self.args = args
 
         # Variable declaration
@@ -42,7 +42,10 @@ class RolloutWorker:
         self.last_episode = None
         self.last_obs = self.env.unwrapped.reset_goal(goal=np.array([None]))
         self.dijkstra_to_goal = None
-        self.state ='GoToFrontier'
+        if self.strategy == 3:
+            self.state = 'Explore'
+        else:
+            self.state ='GoToFrontier'
     
     def test_rollout(self,goals,agent_network:AgentNetwork,episode_duration, animated=False):
         end_episodes = []
@@ -202,7 +205,7 @@ class HMERolloutWorker(RolloutWorker):
                     if time_dict:
                         time_dict['goal_sampler'] += time.time() - t_i
                     # if can't find frontier goal, explore directly
-                    if self.long_term_goal is None or self.long_term_goal == self.current_config:
+                    if self.long_term_goal is None or (self.long_term_goal == self.current_config and self.strategy == 2):
                         self.state = 'Explore'
                         continue
                 no_noise = np.random.uniform() > self.exploration_noise_prob
@@ -211,14 +214,21 @@ class HMERolloutWorker(RolloutWorker):
                 all_episodes += episodes
 
                 success = episodes[-1]['success'][-1]
-                if not success:  # reset at the first failure
-                    self.reset()
-                elif success and self.current_config == self.long_term_goal:
+                if success and self.current_config == self.long_term_goal and self.strategy == 2:
                     self.state = 'Explore'
+                else:
+                    self.reset()
 
             elif self.state == 'Explore':
                 t_i = time.time()
-                last_ag = tuple(self.last_obs['achieved_goal'])
+                # if strategy is Beyond, first sample goal in frontier than sample a goal beyond
+                # only propose the beyond goal
+                if self.strategy == 3:
+                    last_ag = next(iter(agent_network.sample_goal_in_frontier(self.current_config, 1)), None)
+                    if last_ag is None:
+                        last_ag = tuple(self.last_obs['achieved_goal'])
+                else:
+                    last_ag = tuple(self.last_obs['achieved_goal'])
                 explore_goal = next(iter(agent_network.sample_from_frontier(last_ag, 1)), None)  # first element or None
                 if time_dict is not None:
                     time_dict['goal_sampler'] += time.time() - t_i
@@ -226,9 +236,15 @@ class HMERolloutWorker(RolloutWorker):
                     episode = self.generate_one_rollout(explore_goal, False, self.episode_duration)
                     all_episodes.append(episode)
                     success = episode['success'][-1]
-                if explore_goal is None or not success:
+                if explore_goal is None or (not success and self.strategy !=3):
                     self.reset()
                     continue
+                # if strategy is Beyond and goal not reached, then keep performing rollout until budget ends
+                elif self.strategy == 3 and not success:
+                    while not success and len(all_episodes) < self.max_episodes:
+                        episode = self.generate_one_rollout(explore_goal, False, self.episode_duration)
+                        all_episodes.append(episode)
+                        success = episode['success'][-1]
             else:
                 raise Exception(f"unknown state : {self.state}")
 

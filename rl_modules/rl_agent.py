@@ -200,7 +200,6 @@ class RLAgent:
         o_mean, o_std, g_mean, g_std, actor, critic = torch.load(model_path, map_location=lambda storage, loc: storage)
         self.model.actor.load_state_dict(actor)
         self.model.critic.load_state_dict(critic)
-        # self.actor_network.eval()
         self.o_norm.mean = o_mean
         self.o_norm.std = o_std
         self.g_norm.mean = g_mean

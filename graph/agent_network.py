@@ -45,7 +45,7 @@ class AgentNetwork():
                 self.semantic_graph.create_node(start_config)
                 self.semantic_graph.create_node(achieved_goal)
 
-                if self.semantic_graph.getNodeId(goal)!=None:
+                if self.semantic_graph.getNodeId(goal) is not None:
                     self.update_or_create_edge(start_config,goal,success)
                 if (achieved_goal != goal and start_config != achieved_goal
                     and not self.semantic_graph.hasEdge(start_config,achieved_goal)):
@@ -53,10 +53,10 @@ class AgentNetwork():
 
         # update frontier :  
         self.semantic_graph.update()
-        self.teacher.computeFrontier(self.semantic_graph)
+        self.teacher.compute_frontier(self.semantic_graph)
     
     def update_or_create_edge(self,start,end,success):
-        if (start!=end):
+        if start != end:
             if not self.semantic_graph.hasEdge(start,end):
                 self.semantic_graph.create_edge_stats((start,end),self.args.edge_prior)
             self.semantic_graph.update_edge_stats((start,end),success)
@@ -140,6 +140,8 @@ class AgentNetwork():
         self.semantic_graph.log(logger)
         # TODO : , à change selon qu'on soit unordered ou pas. 
         logger.record_tabular('frontier_len',len(self.teacher.agent_frontier))
+        logger.record_tabular('stepping_stones_len', len(self.teacher.agent_stepping_stones))
+        logger.record_tabular('terminal_len', len(self.teacher.agent_terminal))
 
     def save(self,model_path, epoch):
         self.semantic_graph.save(model_path+'/',f'{epoch}')

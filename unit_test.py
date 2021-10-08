@@ -139,17 +139,17 @@ def check_generate_goals(nb_block,unordered_edge = False):
     print([agentNetwork.semantic_graph.configs.inverse[n] for n in  agentNetwork.teacher.agent_frontier])
 
     agentNetwork.semantic_graph.create_node(semantic_operator.empty())
-    agentNetwork.teacher.computeFrontier(agentNetwork.semantic_graph)
+    agentNetwork.teacher.compute_frontier(agentNetwork.semantic_graph)
     print([agentNetwork.semantic_graph.configs.inverse[n] for n in  agentNetwork.teacher.agent_frontier])
 
     stack2 = semantic_operator.close_and_above(semantic_operator.empty(),1,0,True)
     agentNetwork.semantic_graph.create_node(stack2)
-    agentNetwork.teacher.computeFrontier(agentNetwork.semantic_graph)
+    agentNetwork.teacher.compute_frontier(agentNetwork.semantic_graph)
     print([agentNetwork.semantic_graph.configs.inverse[c] for c in  agentNetwork.teacher.agent_frontier])
 
     stack3 = semantic_operator.close_and_above(stack2,2,1,True)
     agentNetwork.semantic_graph.create_node(stack3)
-    agentNetwork.teacher.computeFrontier(agentNetwork.semantic_graph)
+    agentNetwork.teacher.compute_frontier(agentNetwork.semantic_graph)
     print([agentNetwork.semantic_graph.configs.inverse[c] for c in  agentNetwork.teacher.agent_frontier])
 
 def check_stack_number(block_size):

@@ -33,7 +33,7 @@ def get_args():
     # The RL arguments
     parser.add_argument('--gamma', type=float, default=0.99, help='the discount factor')
     parser.add_argument('--alpha', type=float, default=0.2, help='entropy coefficient')
-    parser.add_argument('--automatic_entropy_tuning', type=bool, default=True, help='Tune entropy')
+    parser.add_argument('--automatic_entropy_tuning', type=bool, default=False, help='Tune entropy')
     parser.add_argument('--action-l2', type=float, default=1, help='l2 reg')
     parser.add_argument('--lr-actor', type=float, default=0.001, help='the learning rate of the actor')
     parser.add_argument('--lr-critic', type=float, default=0.001, help='the learning rate of the critic')
@@ -68,11 +68,13 @@ def get_args():
     parser.add_argument('--rollout-exploration', type=str, default='sr_and_k_distance', help='method to compute best path in train rollouts : sr_and_best_distance sr_and_k_distance or sample_sr')
     parser.add_argument('--rollout-exploration-k', type=int, default=5, help='sample among k best paths')
     parser.add_argument('--rollout-distance-ratio', type=float, default=0.5, help='indicate the ratio at which exploration alternate beetween sr and distance criteria')
-    parser.add_argument('--intervention-prob', type=float, default=1., help='the probability of SP intervention')
-
     parser.add_argument('--max-path-len', type=int, default=10, help='maximum path length')
-
+    # Help Me Explore args
+    parser.add_argument('--permutation-bias', type=bool, default=False, help='When goal proposed, add all possible permutations')
+    parser.add_argument('--intervention-prob', type=float, default=1., help='the probability of SP intervention')
     parser.add_argument('--exploration-noise-prob', type=float, default=1., help='When going to frontier, apply noise at ratio')
+    parser.add_argument('--strategy', type=int, default=2, help='Possible values: 0: Frontier; 1: Frontier and Stop, 2: Frontier and Beyond'
+                                                                   '3: Beyond')
 
     args = parser.parse_args()
 
