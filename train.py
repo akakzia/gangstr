@@ -107,11 +107,6 @@ def launch(args):
 
             time_dict['rollout'] += time.time() - t_i
 
-            # Goal Sampler updates
-            t_i = time.time()
-            # episodes = goal_sampler.update(episodes, episode_count)
-            time_dict['gs_update'] += time.time() - t_i
-
             # Storing episodes
             t_i = time.time()
             policy.store(episodes)
