@@ -69,7 +69,7 @@ class RolloutWorker:
         while True:
             current_goal,goal_dist = self.get_next_goal(agent_network,goal,evaluation)
                 
-            episode = self.generate_one_rollout(current_goal, evaluation, episode_duration, animated=False)
+            episode = self.generate_one_rollout(current_goal, evaluation, episode_duration, animated=animated)
             episodes.append(episode)
             self.current_goal_id+=1
             

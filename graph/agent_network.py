@@ -148,7 +148,7 @@ class AgentNetwork():
         with open(f"{model_path}/frontier_{epoch}.config", 'wb') as f:
             pickle.dump(self.teacher.agent_frontier,f,protocol=pickle.HIGHEST_PROTOCOL)
             
-    def load(model_path,epoch,args) ->'AgentNetwork':
+    def load(self, model_path,epoch,args) ->'AgentNetwork':
         semantic_graph = SemanticGraph.load(model_path,f'{epoch}')
         with open(f"{model_path}frontier_{epoch}.config", 'rb') as f:
             frontier = pickle.load(f)
