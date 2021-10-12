@@ -85,18 +85,20 @@ class GoalSampler:
         self.stats['episodes'] = []
         self.stats['global_sr'] = []
         self.stats['nb_internalized'] = []
+        self.stats['nb_ss'] = []
         keys = ['goal_sampler', 'rollout', 'store', 'norm_update','update_graph',
                 'policy_train', 'eval', 'epoch', 'total']
         for k in keys:
             self.stats['t_{}'.format(k)] = []
 
-    def save(self, epoch, episode_count, av_res, av_rew, global_sr, time_dict, goals_per_class, agent_stats, nb_internalized):
+    def save(self, epoch, episode_count, av_res, av_rew, global_sr, time_dict, goals_per_class, agent_stats, nb_internalized, nb_ss):
         self.stats['epoch'].append(epoch)
         self.stats['episodes'].append(episode_count)
         self.stats['global_sr'].append(global_sr)
         for k in time_dict.keys():
             self.stats['t_{}'.format(k)].append(time_dict[k])
         self.stats['nb_internalized'].append(nb_internalized)
+        self.stats['nb_ss'].append(nb_ss)
         for g_id in np.arange(1, len(av_res) + 1):
             self.stats['Eval_SR_{}'.format(g_id)].append(av_res[g_id-1])
             self.stats['Av_Rew_{}'.format(g_id)].append(av_rew[g_id-1])

@@ -13,6 +13,7 @@ class RolloutWorker:
         self.goal_dim = args.env_params['goal']
 
         # Agent memory to internalize SP intervention
+        self.stepping_stones_list = []
         self.stepping_stones_beyond_pairs_list = []
 
         self.max_episodes = args.num_rollouts_per_mpi
@@ -225,6 +226,8 @@ class HMERolloutWorker(RolloutWorker):
                 if success and self.current_config == self.long_term_goal and self.strategy == 2:
                     self.state = 'Explore'
                 else:
+                    # Add stepping stone to agent's memory for internalization
+                    self.stepping_stones_list.append(self.long_term_goal)
                     self.reset()
 
             elif self.state == 'Explore':
@@ -271,7 +274,10 @@ class HMERolloutWorker(RolloutWorker):
             # If no SP intervention
             t_i = time.time()
             if len(agent_network.semantic_graph.configs) > 0:
-                self.long_term_goal = agent_network.sample_goal_uniform(1, use_oracle=False)[0]
+                if np.random.uniform() < self.args.ss_internalization_prob and len(self.stepping_stones_list) > 0:
+                    self.long_term_goal = random.choices(self.stepping_stones_list, k=1)[0]
+                else:
+                    self.long_term_goal = agent_network.sample_goal_uniform(1, use_oracle=False)[0]
             else:
                 self.long_term_goal = tuple(np.random.choice([-1., 1.], size=(1, self.goal_dim))[0])
 
@@ -286,6 +292,8 @@ class HMERolloutWorker(RolloutWorker):
             else:
                 new_episodes = [self.generate_one_rollout(self.long_term_goal, False, self.episode_duration)]
             all_episodes += new_episodes
+            if new_episodes[-1]['success'][-1] and self.long_term_goal in self.stepping_stones_list:
+                self.stepping_stones_list.remove(self.long_term_goal)
             self.reset()
         return all_episodes
 
@@ -327,6 +335,7 @@ class HMERolloutWorker(RolloutWorker):
         """ Synchronize the list of pairs (stepping stone, Beyond) between all workers"""
         # Transformed to set to avoid duplicates
         self.stepping_stones_beyond_pairs_list = list(set(MPI.COMM_WORLD.allreduce(self.stepping_stones_beyond_pairs_list)))
+        self.stepping_stones_list = list(set(MPI.COMM_WORLD.allreduce(self.stepping_stones_list)))
 
 
     def train_rollout(self, agent_network, time_dict=None):

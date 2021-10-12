@@ -162,6 +162,7 @@ def launch(args):
             synchronized_stats = sync(agent_network.teacher.stats)
             # internalized goal pairs
             nb_pairs_internalized = len(rollout_worker.stepping_stones_beyond_pairs_list)
+            nb_ss_internalized = len(rollout_worker.stepping_stones_list)
 
             # Logs
             if rank == 0:
@@ -173,7 +174,7 @@ def launch(args):
                 agent_network.log(logger)
                 logger.record_tabular('replay_nb_edges', policy.buffer.get_nb_edges())
                 log_and_save(goal_sampler, synchronized_stats, agent_network.stats, epoch, episode_count, av_res, av_rewards, global_sr, time_dict,
-                             nb_pairs_internalized)
+                             nb_pairs_internalized, nb_ss_internalized)
 
                 # Saving policy models
                 if epoch % args.save_freq == 0:
@@ -182,8 +183,9 @@ def launch(args):
                 if rank==0: logger.info('\tEpoch #{}: SR: {}'.format(epoch, global_sr))
 
 
-def log_and_save( goal_sampler, teacher_stats, agent_stats, epoch, episode_count, av_res, av_rew, global_sr, time_dict, nb_internalized):
-    goal_sampler.save(epoch, episode_count, av_res, av_rew, global_sr, time_dict, teacher_stats, agent_stats, nb_internalized)
+def log_and_save( goal_sampler, teacher_stats, agent_stats, epoch, episode_count, av_res, av_rew, global_sr, time_dict, nb_internalized,
+                  nb_ss):
+    goal_sampler.save(epoch, episode_count, av_res, av_rew, global_sr, time_dict, teacher_stats, agent_stats, nb_internalized, nb_ss)
     for k, l in goal_sampler.stats.items():
         logger.record_tabular(k, l[-1])
     logger.dump_tabular()

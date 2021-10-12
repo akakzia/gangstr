@@ -72,11 +72,12 @@ def get_args():
     # Help Me Explore args
     parser.add_argument('--permutation-bias', type=bool, default=False, help='When goal proposed, add all possible permutations')
     parser.add_argument('--intervention-prob', type=float, default=1., help='the probability of SP intervention')
-    parser.add_argument('--exploration-noise-prob', type=float, default=1., help='When going to frontier, apply noise at ratio')
+    parser.add_argument('--exploration-noise-prob', type=float, default=0., help='When going to frontier, apply noise at ratio')
     parser.add_argument('--strategy', type=int, default=2, help='Possible values: 0: Frontier; 1: Frontier and Stop, 2: Frontier and Beyond'
                                                                    '3: Beyond')
 
     parser.add_argument('--internalization-prob', type=float, default=0., help='the probability of internalizing SP intervention')
+    parser.add_argument('--ss_internalization-prob', type=float, default=0., help='the probability of internalizing stepping stones')
 
     args = parser.parse_args()
 
