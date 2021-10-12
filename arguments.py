@@ -76,6 +76,8 @@ def get_args():
     parser.add_argument('--strategy', type=int, default=2, help='Possible values: 0: Frontier; 1: Frontier and Stop, 2: Frontier and Beyond'
                                                                    '3: Beyond')
 
+    parser.add_argument('--internalization-prob', type=float, default=0., help='the probability of internalizing SP intervention')
+
     args = parser.parse_args()
 
     return args

@@ -1,7 +1,7 @@
 import random
 from graph.agent_network import AgentNetwork
 import numpy as np
-from graph.SemanticOperation import SemanticOperation, config_to_unique_str
+from mpi4py import MPI
 import time
 
 class RolloutWorker:
@@ -11,6 +11,9 @@ class RolloutWorker:
         self.env_params = args.env_params
         self.goal_sampler = goal_sampler
         self.goal_dim = args.env_params['goal']
+
+        # Agent memory to internalize SP intervention
+        self.stepping_stones_beyond_pairs_list = []
 
         self.max_episodes = args.num_rollouts_per_mpi
         self.episode_duration = args.episode_duration
@@ -42,6 +45,12 @@ class RolloutWorker:
         self.last_episode = None
         self.last_obs = self.env.unwrapped.reset_goal(goal=np.array([None]))
         self.dijkstra_to_goal = None
+        # Internalization
+        if len(self.stepping_stones_beyond_pairs_list) > 0:
+            (self.internalized_ss, self.internalized_beyond) = random.choices(self.stepping_stones_beyond_pairs_list, k=1)[0]
+        else:
+            self.internalized_ss = None
+            self.internalized_beyond = None
         if self.strategy == 3:
             self.state = 'Explore'
         else:
@@ -244,6 +253,9 @@ class HMERolloutWorker(RolloutWorker):
                         episode = self.generate_one_rollout(explore_goal, False, self.episode_duration)
                         all_episodes.append(episode)
                         success = episode['success'][-1]
+                if not success and self.long_term_goal:
+                    # Add pair to agent's memory
+                    self.stepping_stones_beyond_pairs_list.append((self.long_term_goal, explore_goal))
             else:
                 raise Exception(f"unknown state : {self.state}")
 
@@ -277,11 +289,56 @@ class HMERolloutWorker(RolloutWorker):
             self.reset()
         return all_episodes
 
+    def internalize_social_episodes(self, agent_network, time_dict):
+        """ Inputs: agent_network and time_dict
+        Return a list of episode rollouts by the agent using memory of SP interventions"""
+        all_episodes = []
+        self.reset()
+        while len(all_episodes) < self.max_episodes:
+            if self.state == 'GoToFrontier':
+                no_noise = np.random.uniform() > self.exploration_noise_prob
+                episodes, _ = self.guided_rollout(self.internalized_ss, no_noise, agent_network, self.episode_duration,
+                                                  episode_budget=self.max_episodes - len(all_episodes))
+                all_episodes += episodes
+
+                success = episodes[-1]['success'][-1]
+                if success and self.current_config == self.internalized_ss and self.strategy == 2:
+                    self.state = 'Explore'
+                else:
+                    self.reset()
+
+            elif self.state == 'Explore':
+                t_i = time.time()
+                if time_dict is not None:
+                    time_dict['goal_sampler'] += time.time() - t_i
+                episode = self.generate_one_rollout(self.internalized_beyond, False, self.episode_duration)
+                all_episodes.append(episode)
+                success = episode['success'][-1]
+
+                if success:
+                    # remove pair to agent's memory
+                    self.stepping_stones_beyond_pairs_list.remove((self.internalized_ss, self.internalized_beyond))
+            else:
+                raise Exception(f"unknown state : {self.state}")
+
+        return all_episodes
+
+    def sync(self):
+        """ Synchronize the list of pairs (stepping stone, Beyond) between all workers"""
+        # Transformed to set to avoid duplicates
+        self.stepping_stones_beyond_pairs_list = list(set(MPI.COMM_WORLD.allreduce(self.stepping_stones_beyond_pairs_list)))
+
+
     def train_rollout(self, agent_network, time_dict=None):
         if np.random.uniform() < self.args.intervention_prob:
             # SP intervenes
             all_episodes = self.perform_social_episodes(agent_network, time_dict)
         else:
             # Autotelic phase
-            all_episodes = self.perform_individual_episodes(agent_network, time_dict)
+            if np.random.uniform() < self.args.internalization_prob and len(self.stepping_stones_beyond_pairs_list) > 0:
+                # internalize SP intervention
+                all_episodes = self.internalize_social_episodes(agent_network, time_dict)
+            else:
+                all_episodes = self.perform_individual_episodes(agent_network, time_dict)
+        self.sync()
         return all_episodes
