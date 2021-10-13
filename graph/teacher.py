@@ -14,6 +14,9 @@ class Teacher():
         self.agent_frontier = {} # store configuration through networkit node_id from agent_graph
         self.agent_stepping_stones = {}
         self.agent_terminal = {}
+        # Keep counts of teacher interventions
+        self.ss_interventions = 0
+        self.beyond_interventions = 0
         with open('data/classes_and_configs.pkl', 'rb') as f:
             self.config_to_class, _ = pkl.load(f)
 
@@ -109,6 +112,7 @@ class Teacher():
                     self.stats[c+1] += 1
                 except KeyError:
                     pass
+            self.ss_interventions += 1
             return goals
         except IndexError:
             return []
@@ -130,6 +134,7 @@ class Teacher():
                     self.stats[c+1] += 1
                 except KeyError:
                     pass
+            self.beyond_interventions += 1
             return goals
         # If there are goals inside to consolidate and the probability of exploring inside is not exclusive
         elif to_exploit:
