@@ -129,6 +129,20 @@ def config_permutations(config,semantic_operator):
         all_config_perms.append(new_config)
     return all_config_perms
 
+def get_all_permutations_goal(g, semantic_operation):
+    """ Returns a list of all permuted vectors with same semantics as input """
+    res = list(set(config_permutations(g, semantic_operation)))
+    return res
+
+def get_all_permutations_pairs(s, r, semantic_operation):
+    """ Returns a list of all permuted pairs of vectors with same semantics as input """
+    p1 = config_permutations(s, semantic_operation)
+    p2 = config_permutations(r, semantic_operation)
+    l = set()
+    for e1, e2 in zip(p1, p2):
+        l.add((e1, e2))
+    return list(l)
+
 def config_to_unique_str(config,semantic_operator):
     preds = []
     for pred_id in range(len(config)):

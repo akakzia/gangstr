@@ -3,6 +3,7 @@ import numpy as np
 from graph.semantic_graph import SemanticGraph
 from mpi4py import MPI
 from graph.teacher import Teacher
+from graph.SemanticOperation import get_all_permutations_pairs
 import pickle
 
 class AgentNetwork():
@@ -42,14 +43,27 @@ class AgentNetwork():
                 except KeyError:
                     pass
 
-                self.semantic_graph.create_node(start_config)
-                self.semantic_graph.create_node(achieved_goal)
+                if self.args.add_all_permutations:
+                    all_pairs_list = get_all_permutations_pairs(start_config, achieved_goal, self.semantic_graph.semantic_operation)
+                    all_pairs_goal = get_all_permutations_pairs(start_config, goal, self.semantic_graph.semantic_operation)
 
-                if self.semantic_graph.getNodeId(goal) is not None:
-                    self.update_or_create_edge(start_config,goal,success)
-                if (achieved_goal != goal and start_config != achieved_goal
-                    and not self.semantic_graph.hasEdge(start_config,achieved_goal)):
-                        self.semantic_graph.create_edge_stats((start_config,achieved_goal),self.args.edge_prior)
+                    for s, r in all_pairs_list:
+                        self.semantic_graph.create_node(s)
+                        self.semantic_graph.create_node(r)
+                        if r != goal and s != r and not self.semantic_graph.hasEdge(s, r):
+                            self.semantic_graph.create_edge_stats((s,r),self.args.edge_prior)
+                    for s, r in all_pairs_goal:
+                        if self.semantic_graph.getNodeId(r) is not None:
+                            self.update_or_create_edge(s, r, success)
+                else:
+                    self.semantic_graph.create_node(start_config)
+                    self.semantic_graph.create_node(achieved_goal)
+                    if (achieved_goal != goal and start_config != achieved_goal
+                        and not self.semantic_graph.hasEdge(start_config,achieved_goal)):
+                            self.semantic_graph.create_edge_stats((start_config,achieved_goal),self.args.edge_prior)
+
+                    if self.semantic_graph.getNodeId(goal) is not None:
+                        self.update_or_create_edge(start_config,goal,success)
 
         # update frontier :  
         self.semantic_graph.update()

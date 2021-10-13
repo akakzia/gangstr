@@ -1,5 +1,6 @@
 import random
 from graph.agent_network import AgentNetwork
+from graph.SemanticOperation import get_all_permutations_goal
 import numpy as np
 from mpi4py import MPI
 import time
@@ -201,6 +202,13 @@ class RolloutWorker:
 
         
 class HMERolloutWorker(RolloutWorker):
+    def update_ss_list(self, g, op=None):
+        if self.args.add_all_permutations:
+            all_permutation_goals = get_all_permutations_goal(g, op)
+            for e in all_permutation_goals:
+                self.stepping_stones_list.append(e)
+        else:
+            self.stepping_stones_list.append(g)
     def perform_social_episodes(self, agent_network, time_dict):
         """ Inputs: agent_network and time_dict
         Return a list of episode rollouts by the agent using social goals"""
@@ -227,7 +235,7 @@ class HMERolloutWorker(RolloutWorker):
                     self.state = 'Explore'
                 else:
                     # Add stepping stone to agent's memory for internalization
-                    self.stepping_stones_list.append(self.long_term_goal)
+                    self.update_ss_list(self.long_term_goal, agent_network.semantic_graph.semantic_operation)
                     self.reset()
 
             elif self.state == 'Explore':

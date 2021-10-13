@@ -79,6 +79,8 @@ def get_args():
     parser.add_argument('--internalization-prob', type=float, default=0., help='the probability of internalizing SP intervention')
     parser.add_argument('--ss-internalization-prob', type=float, default=0., help='the probability of internalizing stepping stones')
 
+    parser.add_argument('--add-all-permutations', type=bool, default=False, help='Whether to add all permutation to graph')
+
     args = parser.parse_args()
 
     return args
