@@ -156,8 +156,6 @@ class AgentNetwork():
         logger.record_tabular('frontier_len',len(self.teacher.agent_frontier))
         logger.record_tabular('stepping_stones_len', len(self.teacher.agent_stepping_stones))
         logger.record_tabular('terminal_len', len(self.teacher.agent_terminal))
-        logger.record_tabular('nb_ss_proposed', self.teacher.ss_interventions)
-        logger.record_tabular('nb_beyond_proposed', self.teacher.beyond_interventions)
 
     def save(self,model_path, epoch):
         self.semantic_graph.save(model_path+'/',f'{epoch}')

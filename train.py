@@ -159,7 +159,8 @@ def launch(args):
             time_dict['eval'] += time.time() - t_i
 
             # synchronize goals count per class in teacher
-            synchronized_stats = sync(agent_network.teacher.stats)
+            synchronized_stats, sync_nb_ss, sync_nb_beyond = sync(agent_network.teacher.stats, agent_network.teacher.ss_interventions,
+                                                                  agent_network.teacher.beyond_interventions)
             # internalized goal pairs
             nb_pairs_internalized = len(rollout_worker.stepping_stones_beyond_pairs_list)
             nb_ss_internalized = len(rollout_worker.stepping_stones_list)
@@ -173,8 +174,8 @@ def launch(args):
                 
                 agent_network.log(logger)
                 logger.record_tabular('replay_nb_edges', policy.buffer.get_nb_edges())
-                log_and_save(goal_sampler, synchronized_stats, agent_network.stats, epoch, episode_count, av_res, av_rewards, global_sr, time_dict,
-                             nb_pairs_internalized, nb_ss_internalized)
+                log_and_save(goal_sampler, synchronized_stats, sync_nb_ss, sync_nb_beyond, agent_network.stats, epoch, episode_count,
+                             av_res, av_rewards, global_sr, time_dict, nb_pairs_internalized, nb_ss_internalized)
 
                 # Saving policy models
                 if epoch % args.save_freq == 0:
@@ -183,20 +184,23 @@ def launch(args):
                 if rank==0: logger.info('\tEpoch #{}: SR: {}'.format(epoch, global_sr))
 
 
-def log_and_save( goal_sampler, teacher_stats, agent_stats, epoch, episode_count, av_res, av_rew, global_sr, time_dict, nb_internalized,
-                  nb_ss):
-    goal_sampler.save(epoch, episode_count, av_res, av_rew, global_sr, time_dict, teacher_stats, agent_stats, nb_internalized, nb_ss)
+def log_and_save( goal_sampler, teacher_stats, proposed_ss, proposed_beyond, agent_stats, epoch, episode_count, av_res, av_rew, global_sr,
+                  time_dict, nb_internalized, nb_ss):
+    goal_sampler.save(epoch, episode_count, av_res, av_rew, global_sr, time_dict, teacher_stats, agent_stats, nb_internalized, nb_ss,
+                      proposed_ss, proposed_beyond)
     for k, l in goal_sampler.stats.items():
         logger.record_tabular(k, l[-1])
     logger.dump_tabular()
 
-def sync(x):
+def sync(x, a, b):
     """ x: dictionary of counts for every class_goal proposed by the teacher
         return the synchronized dictionary among all cpus """
     res = x.copy()
     for k in x.keys():
         res[k] = MPI.COMM_WORLD.allreduce(x[k], op=MPI.SUM)
-    return res
+    sync_a = MPI.COMM_WORLD.allreduce(a, op=MPI.SUM)
+    sync_b = MPI.COMM_WORLD.allreduce(b, op=MPI.SUM)
+    return res, sync_a, sync_b
 
 
 if __name__ == '__main__':
