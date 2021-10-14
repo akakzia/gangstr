@@ -3,7 +3,6 @@ import numpy as np
 from graph.semantic_graph import SemanticGraph
 from mpi4py import MPI
 from graph.teacher import Teacher
-from graph.SemanticOperation import get_all_permutations_pairs
 import pickle
 
 class AgentNetwork():
@@ -21,7 +20,7 @@ class AgentNetwork():
         all_episodes = MPI.COMM_WORLD.allgather(episodes)
         all_episode_list = [e for eps in all_episodes 
                                 for e in eps] # flatten the list of episodes gathered by all actors
-        # update agent graph : 
+        # update agent graph :
         for e in all_episode_list:
             # Verify if last achieved goal is stable during last 10 steps
             condition = True
@@ -43,29 +42,16 @@ class AgentNetwork():
                 except KeyError:
                     pass
 
-                if self.args.add_all_permutations:
-                    all_pairs_list = get_all_permutations_pairs(start_config, achieved_goal, self.semantic_graph.semantic_operation)
-                    all_pairs_goal = get_all_permutations_pairs(start_config, goal, self.semantic_graph.semantic_operation)
+                self.semantic_graph.create_node(start_config)
+                self.semantic_graph.create_node(achieved_goal)
 
-                    for s, r in all_pairs_list:
-                        self.semantic_graph.create_node(s)
-                        self.semantic_graph.create_node(r)
-                        if r != goal and s != r and not self.semantic_graph.hasEdge(s, r):
-                            self.semantic_graph.create_edge_stats((s,r),self.args.edge_prior)
-                    for s, r in all_pairs_goal:
-                        if self.semantic_graph.getNodeId(r) is not None:
-                            self.update_or_create_edge(s, r, success)
-                else:
-                    self.semantic_graph.create_node(start_config)
-                    self.semantic_graph.create_node(achieved_goal)
-                    if (achieved_goal != goal and start_config != achieved_goal
-                        and not self.semantic_graph.hasEdge(start_config,achieved_goal)):
-                            self.semantic_graph.create_edge_stats((start_config,achieved_goal),self.args.edge_prior)
+                if self.semantic_graph.getNodeId(goal) is not None:
+                    self.update_or_create_edge(start_config, goal, success)
+                if (achieved_goal != goal and start_config != achieved_goal
+                        and not self.semantic_graph.hasEdge(start_config, achieved_goal)):
+                    self.semantic_graph.create_edge_stats((start_config, achieved_goal), self.args.edge_prior)
 
-                    if self.semantic_graph.getNodeId(goal) is not None:
-                        self.update_or_create_edge(start_config,goal,success)
-
-        # update frontier :  
+        # update frontier :
         self.semantic_graph.update()
         self.teacher.compute_frontier(self.semantic_graph)
     
@@ -116,12 +102,12 @@ class AgentNetwork():
             source_to_neighbors_sr,neighbors_to_goal_sr,_ = self.semantic_graph.get_neighbors_to_goal_sr(source,neighbors,goal,reversed_dijkstra)
             source_to_neighbour_to_goal_sr = source_to_neighbors_sr*neighbors_to_goal_sr
             
-            # remove neighbors with SR lower than current node : 
+            # remove neighbors with SR lower than current node :
             inds = neighbors_to_goal_sr>source_sr
             neighbors = np.array(neighbors)[inds]
             source_to_neighbour_to_goal_sr = source_to_neighbour_to_goal_sr[inds]
 
-            # filter neighbors :  
+            # filter neighbors :
             # Among multiple neighbors belonging to the same unordered edge, only keep one by sampling among highest SR neighbor_to_goal
             edges = [self.semantic_graph.edge_config_to_edge_id((source,tuple(neigh)))for neigh in neighbors]
             edges,inv_ids =  np.unique(np.array(edges),return_inverse = True)
@@ -135,7 +121,7 @@ class AgentNetwork():
             neighbors = neighbors[filtered_ids]
             source_to_neighbour_to_goal_sr = source_to_neighbour_to_goal_sr[filtered_ids]
             
-            # only keep k_ largest probs : 
+            # only keep k_ largest probs :
             if len(source_to_neighbour_to_goal_sr) > self.args.rollout_exploration_k:
                 inds = np.argpartition(source_to_neighbour_to_goal_sr, -self.args.rollout_exploration_k)[-self.args.rollout_exploration_k:]
                 neighbors = np.array(neighbors)[inds]
@@ -152,7 +138,7 @@ class AgentNetwork():
 
     def log(self,logger):
         self.semantic_graph.log(logger)
-        # TODO : , à change selon qu'on soit unordered ou pas. 
+        # TODO : , à change selon qu'on soit unordered ou pas.
         logger.record_tabular('frontier_len',len(self.teacher.agent_frontier))
         logger.record_tabular('stepping_stones_len', len(self.teacher.agent_stepping_stones))
         logger.record_tabular('terminal_len', len(self.teacher.agent_terminal))
