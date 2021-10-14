@@ -331,7 +331,7 @@ class HMERolloutWorker(RolloutWorker):
                 all_episodes.append(episode)
                 success = episode['success'][-1]
 
-                if success:
+                if success and (self.internalized_ss, self.internalized_beyond) in self.stepping_stones_beyond_pairs_list:
                     # remove pair to agent's memory
                     self.stepping_stones_beyond_pairs_list.remove((self.internalized_ss, self.internalized_beyond))
             else:
