@@ -279,11 +279,13 @@ class HMERolloutWorker(RolloutWorker):
 
         self.reset()
         while len(all_episodes) < self.max_episodes:
+            internalization = False
             # If no SP intervention
             t_i = time.time()
             if len(agent_network.semantic_graph.configs) > 0:
                 if np.random.uniform() < self.args.ss_internalization_prob and len(self.stepping_stones_list) > 0:
                     self.long_term_goal = random.choices(self.stepping_stones_list, k=1)[0]
+                    internalization = True
                 else:
                     self.long_term_goal = agent_network.sample_goal_uniform(1, use_oracle=False)[0]
             else:
@@ -300,7 +302,7 @@ class HMERolloutWorker(RolloutWorker):
             else:
                 new_episodes = [self.generate_one_rollout(self.long_term_goal, False, self.episode_duration)]
             all_episodes += new_episodes
-            if new_episodes[-1]['success'][-1] and self.long_term_goal in self.stepping_stones_list:
+            if all_episodes[-1]['success'][-1] and internalization:
                 self.stepping_stones_list.remove(self.long_term_goal)
             self.reset()
         return all_episodes
