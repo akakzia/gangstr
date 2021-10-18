@@ -81,7 +81,7 @@ class RolloutWorker:
                 else:
                     last_episode = episodes[-1]
                     last_episode['success'] = False
-            except IndexError:
+            except:
                 last_episode = self.generate_one_rollout(goal, True, episode_duration, animated=animated)
             end_episodes.append(last_episode)
         self.reset()
