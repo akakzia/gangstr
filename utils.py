@@ -12,7 +12,7 @@ def init_storage(args):
     if not os.path.exists(args.save_dir):
         os.mkdir(args.save_dir)
     # path to save the model
-    logdir = os.path.join(args.save_dir, '{}_{}_{}'.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.env_name, args.architecture))
+    logdir = os.path.join(args.save_dir, '{}_{}_{}'.format(datetime.now().strftime("%Y-%m-%d %H:%M:%S"), args.env_name, args.seed))
     # path to save evaluations
     model_path = os.path.join(logdir, 'models')
     if not os.path.exists(logdir):
