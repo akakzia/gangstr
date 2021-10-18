@@ -67,6 +67,26 @@ class RolloutWorker:
         self.reset()
         return end_episodes
 
+    def test_social_rollouts(self,goals,agent_network:AgentNetwork,episode_duration, animated=False):
+        end_episodes = []
+        for goal in goals :
+            self.reset()
+            path, _, _ = agent_network.teacher.oracle_graph.sample_shortest_path(self.last_obs['achieved_goal'], goal,
+                                                                                 algorithm=self.args.evaluation_algorithm)
+            try:
+                intermediate_goal = path[-2]
+                episodes,_ = self.guided_rollout(intermediate_goal,True, agent_network, episode_duration, animated=animated)
+                if len(episodes) < self.args.max_path_len:
+                    last_episode = self.generate_one_rollout(goal, True, episode_duration, animated=animated)
+                else:
+                    last_episode = episodes[-1]
+                    last_episode['success'] = False
+            except IndexError:
+                last_episode = self.generate_one_rollout(goal, True, episode_duration, animated=animated)
+            end_episodes.append(last_episode)
+        self.reset()
+        return end_episodes
+
     def guided_rollout(self,goal,evaluation,agent_network:AgentNetwork,episode_duration,episode_budget=None, animated=False):
         episodes = []
         goal = tuple(goal)
