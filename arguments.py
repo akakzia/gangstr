@@ -81,6 +81,8 @@ def get_args():
 
     parser.add_argument('--add-all-permutations', type=bool, default=False, help='Whether to add all permutation to graph')
 
+    parser.add_argument('--teacher-bias', type=bool, default=True, help='If True, automatically add given goals by SP to the agent graph')
+
     args = parser.parse_args()
 
     return args
