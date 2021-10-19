@@ -37,6 +37,9 @@ class RLAgent:
         elif self.architecture == 'deep_sets':
             from rl_modules.deepsets_models import DeepSetSemantic
             self.model = DeepSetSemantic(self.env_params, args)
+        elif self.architecture == 'transformer':
+            from rl_modules.transformer_models import TransformerSemantic
+            self.model = TransformerSemantic(self.env_params, args)
         else:
             raise NotImplementedError
         # sync the networks across the CPUs

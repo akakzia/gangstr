@@ -51,7 +51,7 @@ def get_args():
     parser.add_argument('--normalize_goal', type=bool, default=False, help='do evaluation at the end of the epoch w/ frequency')
     parser.add_argument('--clip-range', type=float, default=5, help='the clip range')
     # the gnns arguments
-    parser.add_argument('--architecture', type=str, default='gnn', help='The architecture of the networks')
+    parser.add_argument('--architecture', type=str, default='transformer', help='The architecture of the networks')
     parser.add_argument('--aggregation-fct', type=str, default='max', help='node-wise aggregation function')
     parser.add_argument('--readout-fct', type=str, default='sum', help='readout aggregation function')
     # the testing arguments
@@ -81,6 +81,8 @@ def get_args():
     parser.add_argument('--add-all-permutations', type=bool, default=False, help='Whether to add all permutation to graph')
 
     parser.add_argument('--teacher-bias', type=bool, default=True, help='If True, automatically add given goals by SP to the agent graph')
+
+    parser.add_argument('--nb-attention-heads', type=int, default=5, help='')
 
     args = parser.parse_args()
 
