@@ -78,15 +78,14 @@ class GoalSampler:
             n = 6
         for i in np.arange(1, n+1):
             self.stats['Eval_SR_{}'.format(i)] = []
-            self.stats['Social_Eval_SR_{}'.format(i)] = []
             self.stats['# class_teacher {}'.format(i)] = []
             self.stats['# class_agent {}'.format(i)] = []
         self.stats['epoch'] = []
         self.stats['episodes'] = []
         self.stats['global_sr'] = []
-        self.stats['social_global_sr'] = []
         self.stats['nb_internalized'] = []
-        self.stats['nb_ss'] = []
+        self.stats['nb_removed_intern'] = []
+        self.stats['nb_removed_indiv'] = []
         self.stats['proposed_ss'] = []
         self.stats['proposed_beyond'] = []
         keys = ['goal_sampler', 'rollout', 'store', 'norm_update','update_graph',
@@ -94,21 +93,20 @@ class GoalSampler:
         for k in keys:
             self.stats['t_{}'.format(k)] = []
 
-    def save(self, epoch, episode_count, av_res, global_sr, av_social_res, global_social_sr, time_dict, goals_per_class, agent_stats, nb_internalized,
-             nb_ss, proposed_ss, proposed_beyond):
+    def save(self, epoch, episode_count, av_res, global_sr, time_dict, goals_per_class, agent_stats, nb_internalized,
+             nb_removed_intern, nb_removed_individual, proposed_ss, proposed_beyond):
         self.stats['epoch'].append(epoch)
         self.stats['episodes'].append(episode_count)
         self.stats['global_sr'].append(global_sr)
-        self.stats['social_global_sr'].append(global_social_sr)
         for k in time_dict.keys():
             self.stats['t_{}'.format(k)].append(time_dict[k])
         self.stats['nb_internalized'].append(nb_internalized)
-        self.stats['nb_ss'].append(nb_ss)
+        self.stats['nb_removed_intern'].append(nb_removed_intern)
+        self.stats['nb_removed_indiv'].append(nb_removed_individual)
         self.stats['proposed_ss'].append(proposed_ss)
         self.stats['proposed_beyond'].append(proposed_beyond)
         for g_id in np.arange(1, len(av_res) + 1):
             self.stats['Eval_SR_{}'.format(g_id)].append(av_res[g_id-1])
-            self.stats['Social_Eval_SR_{}'.format(g_id)].append(av_social_res[g_id - 1])
         for k in goals_per_class.keys():
             self.stats['# class_teacher {}'.format(k)].append(goals_per_class[k])
             self.stats['# class_agent {}'.format(k)].append(agent_stats[k])

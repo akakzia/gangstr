@@ -76,7 +76,7 @@ def get_args():
                                                                    '3: Beyond')
 
     parser.add_argument('--internalization-prob', type=float, default=0.5, help='the probability of internalizing SP intervention')
-    parser.add_argument('--ss-internalization-prob', type=float, default=0.2, help='the probability of internalizing stepping stones')
+    parser.add_argument('--ss-internalization-prob', type=float, default=0.0, help='the probability of internalizing stepping stones')
 
     parser.add_argument('--add-all-permutations', type=bool, default=False, help='Whether to add all permutation to graph')
 

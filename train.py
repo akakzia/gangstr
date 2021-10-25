@@ -155,13 +155,6 @@ def launch(args):
             rewards = np.array([e['rewards'][-1] for e in episodes])
             all_results = MPI.COMM_WORLD.gather(results, root=0)
 
-            social_episodes = rollout_worker.test_social_rollouts(eval_goals,agent_network,
-                                                                  episode_duration=args.episode_duration,
-                                                                  animated=False)
-
-            social_results = np.array([e['success'][-1].astype(np.float32) for e in social_episodes])
-            social_rewards = np.array([e['rewards'][-1] for e in episodes])
-            all_social_results = MPI.COMM_WORLD.gather(results, root=0)
             time_dict['eval'] += time.time() - t_i
 
             # synchronize goals count per class in teacher
@@ -169,21 +162,21 @@ def launch(args):
                                                                   agent_network.teacher.beyond_interventions)
             # internalized goal pairs
             nb_pairs_internalized = len(rollout_worker.stepping_stones_beyond_pairs_list)
-            nb_ss_internalized = len(rollout_worker.stepping_stones_list)
+            # nb_ss_internalized = len(rollout_worker.stepping_stones_list)
+            nb_removed_in_internalization = len(rollout_worker.to_remove_internalization)
+            nb_removed_in_individual = len(rollout_worker.to_remove_individual)
 
             # Logs
             if rank == 0:
-                assert len(all_results) == args.num_workers  and len(all_social_results) == args.num_workers # MPI test
+                assert len(all_results) == args.num_workers# MPI test
                 av_res = np.array(all_results).mean(axis=0)
                 global_sr = np.mean(av_res)
-
-                av_social_res = np.array(all_social_results).mean(axis=0)
-                global_social_sr = np.mean(av_social_res)
                 
                 agent_network.log(logger)
                 logger.record_tabular('replay_nb_edges', policy.buffer.get_nb_edges())
                 log_and_save(goal_sampler, synchronized_stats, sync_nb_ss, sync_nb_beyond, agent_network.stats, epoch, episode_count,
-                             av_res, global_sr, av_social_res, global_social_sr, time_dict, nb_pairs_internalized, nb_ss_internalized)
+                             av_res, global_sr, time_dict, nb_pairs_internalized, nb_removed_in_internalization,
+                             nb_removed_in_individual)
 
                 # Saving policy models
                 if epoch % args.save_freq == 0:
@@ -193,9 +186,9 @@ def launch(args):
 
 
 def log_and_save( goal_sampler, teacher_stats, proposed_ss, proposed_beyond, agent_stats, epoch, episode_count, av_res, global_sr,
-                  av_social_res, global_social_sr, time_dict, nb_internalized, nb_ss):
-    goal_sampler.save(epoch, episode_count, av_res, global_sr, av_social_res, global_social_sr, time_dict, teacher_stats, agent_stats,
-                      nb_internalized, nb_ss, proposed_ss, proposed_beyond)
+                  time_dict, nb_internalized, nb_removed_inter, nb_removed_indiv):
+    goal_sampler.save(epoch, episode_count, av_res, global_sr, time_dict, teacher_stats, agent_stats,
+                      nb_internalized, nb_removed_inter, nb_removed_indiv, proposed_ss, proposed_beyond)
     for k, l in goal_sampler.stats.items():
         logger.record_tabular(k, l[-1])
     logger.dump_tabular()

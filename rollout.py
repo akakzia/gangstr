@@ -17,6 +17,10 @@ class RolloutWorker:
         self.stepping_stones_list = []
         self.stepping_stones_beyond_pairs_list = []
 
+        # List of items to remove from internalization memory
+        self.to_remove_internalization = []
+        self.to_remove_individual = []
+
         self.max_episodes = args.num_rollouts_per_mpi
         self.episode_duration = args.episode_duration
         self.strategy = args.strategy
@@ -255,7 +259,7 @@ class HMERolloutWorker(RolloutWorker):
                     self.state = 'Explore'
                 else:
                     # Add stepping stone to agent's memory for internalization
-                    self.update_ss_list(self.long_term_goal, agent_network.semantic_graph.semantic_operation)
+                    # self.update_ss_list(self.long_term_goal, agent_network.semantic_graph.semantic_operation)
                     self.reset()
 
             elif self.state == 'Explore':
@@ -322,8 +326,11 @@ class HMERolloutWorker(RolloutWorker):
             else:
                 new_episodes = [self.generate_one_rollout(self.long_term_goal, False, self.episode_duration)]
             all_episodes += new_episodes
-            if all_episodes[-1]['success'][-1] and internalization:
-                self.stepping_stones_list.remove(self.long_term_goal)
+            if all_episodes[-1]['success'][-1]:
+                before_last_goal = all_episodes[-1]['ag'][0]
+                last_goal = all_episodes[-1]['ag'][-1]
+                if (before_last_goal, last_goal) in self.stepping_stones_beyond_pairs_list:
+                    self.to_remove_individual.append((before_last_goal, last_goal))
             self.reset()
         return all_episodes
 
@@ -355,7 +362,8 @@ class HMERolloutWorker(RolloutWorker):
 
                 if success and (self.internalized_ss, self.internalized_beyond) in self.stepping_stones_beyond_pairs_list:
                     # remove pair to agent's memory
-                    self.stepping_stones_beyond_pairs_list.remove((self.internalized_ss, self.internalized_beyond))
+                    self.to_remove_internalization.append((self.internalized_ss, self.internalized_beyond))
+                    # self.stepping_stones_beyond_pairs_list.remove((self.internalized_ss, self.internalized_beyond))
             else:
                 raise Exception(f"unknown state : {self.state}")
 
@@ -365,10 +373,20 @@ class HMERolloutWorker(RolloutWorker):
         """ Synchronize the list of pairs (stepping stone, Beyond) between all workers"""
         # Transformed to set to avoid duplicates
         self.stepping_stones_beyond_pairs_list = list(set(MPI.COMM_WORLD.allreduce(self.stepping_stones_beyond_pairs_list)))
-        self.stepping_stones_list = list(set(MPI.COMM_WORLD.allreduce(self.stepping_stones_list)))
+        self.to_remove_internalization = list(set(MPI.COMM_WORLD.allreduce(self.to_remove_internalization)))
+        self.to_remove_individual = list(set(MPI.COMM_WORLD.allreduce(self.to_remove_individual)))
+        if len(self.to_remove_internalization) > 0:
+            for e in self.to_remove_internalization:
+                self.stepping_stones_beyond_pairs_list.remove(e)
+        if len(self.to_remove_individual) > 0:
+            for e in self.to_remove_individual:
+                self.stepping_stones_beyond_pairs_list.remove(e)
+        # self.stepping_stones_list = list(set(MPI.COMM_WORLD.allreduce(self.stepping_stones_list)))
 
 
     def train_rollout(self, agent_network, time_dict=None):
+        self.to_remove_internalization = []
+        self.to_remove_individual = []
         if np.random.uniform() < self.args.intervention_prob:
             # SP intervenes
             all_episodes = self.perform_social_episodes(agent_network, time_dict)
