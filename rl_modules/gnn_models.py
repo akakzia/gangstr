@@ -4,7 +4,7 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 from itertools import permutations
 import numpy as np
-from rl_modules.networks import GnnMessagePassing, PhiCriticDeepSet, PhiActorDeepSet, RhoActorDeepSet, RhoCriticDeepSet
+from rl_modules.networks import GnnMessagePassing, PhiCriticDeepSet, PhiActorDeepSet, RhoActorDeepSet, RhoCriticDeepSet, SelfAttention
 from utils import get_graph_structure
 
 epsilon = 1e-6
@@ -26,6 +26,7 @@ class GnnCritic(nn.Module):
 
         self.mp_critic = GnnMessagePassing(dim_mp_input, dim_mp_output)
         self.phi_critic = PhiCriticDeepSet(dim_phi_critic_input, 256, dim_phi_critic_output)
+        self.self_attention = SelfAttention(dim_phi_critic_output, 1)  # test 1 attention heads
         self.rho_critic = RhoCriticDeepSet(dim_rho_critic_input, dim_rho_critic_output)
 
         self.edges = edges
@@ -54,15 +55,20 @@ class GnnCritic(nn.Module):
 
         output_phi_critic_1, output_phi_critic_2 = self.phi_critic(inp)
         if self.readout == 'sum':
-            output_phi_critic_1 = output_phi_critic_1.sum(dim=0)
-            output_phi_critic_2 = output_phi_critic_2.sum(dim=0)
+            output_phi_critic_1 = output_phi_critic_1.permute(1, 0, 2)
+            output_self_attention_1 = self.self_attention(output_phi_critic_1)
+            output_self_attention_1 = output_self_attention_1.sum(dim=1)
+
+            output_phi_critic_2 = output_phi_critic_2.permute(1, 0, 2)
+            output_self_attention_2 = self.self_attention(output_phi_critic_2)
+            output_self_attention_2 = output_self_attention_2.sum(dim=1)
         elif self.readout == 'mean':
             output_phi_critic_1 = output_phi_critic_1.mean(dim=0)
             output_phi_critic_2 = output_phi_critic_2.mean(dim=0)
         elif self.readout == 'max':
             output_phi_critic_1 = output_phi_critic_1.max(dim=0).values
             output_phi_critic_2 = output_phi_critic_2.max(dim=0).values
-        q1_pi_tensor, q2_pi_tensor = self.rho_critic(output_phi_critic_1, output_phi_critic_2)
+        q1_pi_tensor, q2_pi_tensor = self.rho_critic(output_self_attention_1, output_self_attention_2)
         return q1_pi_tensor, q2_pi_tensor
 
     def message_passing(self, obs, ag, g):
@@ -95,6 +101,7 @@ class GnnActor(nn.Module):
         self.readout = readout
 
         self.phi_actor = PhiActorDeepSet(dim_phi_actor_input, 256, dim_phi_actor_output)
+        self.self_attention = SelfAttention(dim_phi_actor_output, 1) # test 1 attention heads
         self.rho_actor = RhoActorDeepSet(dim_rho_actor_input, dim_rho_actor_output)
 
         self.incoming_edges = incoming_edges
@@ -121,7 +128,9 @@ class GnnActor(nn.Module):
 
         output_phi_actor = self.phi_actor(inp)
         if self.readout == 'sum':
-            output_phi_actor = output_phi_actor.sum(dim=0)
+            output_phi_actor = output_phi_actor.permute(1, 0, 2)
+            output_self_attention = self.self_attention(output_phi_actor)
+            output_self_attention = output_self_attention.sum(dim=1)
         elif self.readout == 'mean':
             output_phi_actor = output_phi_actor.mean(dim=0)
         elif self.readout == 'max':
@@ -129,7 +138,7 @@ class GnnActor(nn.Module):
         else:
             raise NotImplementedError
 
-        mean, logstd = self.rho_actor(output_phi_actor)
+        mean, logstd = self.rho_actor(output_self_attention)
         return mean, logstd
 
     def sample(self, obs, edge_features):
