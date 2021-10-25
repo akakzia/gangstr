@@ -124,6 +124,8 @@ class RolloutWorker:
         self.env.unwrapped.binary_goal = np.array(goal)
         obs = self.last_obs['observation']
         ag = self.last_obs['achieved_goal']
+        masked_ids = np.where(g == 0)[0]
+        g[masked_ids] = ag[masked_ids]
 
         ep_obs, ep_ag, ep_g, ep_actions, ep_success, ep_rewards = [], [], [], [], [], []
         # Start to collect samples
