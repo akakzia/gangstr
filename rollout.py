@@ -327,8 +327,8 @@ class HMERolloutWorker(RolloutWorker):
                 new_episodes = [self.generate_one_rollout(self.long_term_goal, False, self.episode_duration)]
             all_episodes += new_episodes
             if all_episodes[-1]['success'][-1]:
-                before_last_goal = all_episodes[-1]['ag'][0]
-                last_goal = all_episodes[-1]['ag'][-1]
+                before_last_goal = tuple(all_episodes[-1]['ag'][0])
+                last_goal = tuple(all_episodes[-1]['ag'][-1])
                 if (before_last_goal, last_goal) in self.stepping_stones_beyond_pairs_list:
                     self.to_remove_individual.append((before_last_goal, last_goal))
             self.reset()
