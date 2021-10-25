@@ -14,7 +14,7 @@ scratch = os.environ['SCRATCH']
 mkdir_p(job_directory)
 
 nb_seeds = 10
-values = [1.0, 0.5, 0.2, 0.05, 0.02, 0.01, 0.005, 0.002, 0.001, 0.0]
+values = [1.0, 0.2, 0.05, 0.005, 0.002, 0.001, 0.0]
 
 for i in range(nb_seeds):
     for value in values:
