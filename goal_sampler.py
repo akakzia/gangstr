@@ -38,7 +38,10 @@ class GoalSampler:
             g_norm_tensor = torch.tensor(g_norm, dtype=torch.float32)
             ag_norm_tensor = torch.tensor(ag_norm, dtype=torch.float32)
 
-            raise NotImplementedError
+            with torch.no_grad():
+                self.policy.model.forward_pass(obs_norm_tensor, ag_norm_tensor, g_norm_tensor)
+                scores = np.std(self.policy.model.target_q_pi_tensor.numpy(), axis=1)**2
+            return tuple(goals[np.argmax(scores)])
         else:
             raise NotImplementedError
 
@@ -81,7 +84,8 @@ class GoalSampler:
         for i in np.arange(1, n+1):
             self.stats['Eval_SR_{}'.format(i)] = []
             self.stats['# class_teacher {}'.format(i)] = []
-            self.stats['# class_agent {}'.format(i)] = []
+            self.stats['# class_ag {}'.format(i)] = []
+            self.stats['# class_g {}'.format(i)] = []
         self.stats['epoch'] = []
         self.stats['episodes'] = []
         self.stats['global_sr'] = []
@@ -93,8 +97,8 @@ class GoalSampler:
         for k in keys:
             self.stats['t_{}'.format(k)] = []
 
-    def save(self, epoch, episode_count, av_res, global_sr, time_dict, goals_per_class, agent_stats, nb_internalized,
-             proposed_ss, proposed_beyond):
+    def save(self, epoch, episode_count, av_res, global_sr, time_dict, goals_per_class, agent_achieved_stats, agent_target_stats,
+             nb_internalized, proposed_ss, proposed_beyond):
         self.stats['epoch'].append(epoch)
         self.stats['episodes'].append(episode_count)
         self.stats['global_sr'].append(global_sr)
@@ -107,4 +111,5 @@ class GoalSampler:
             self.stats['Eval_SR_{}'.format(g_id)].append(av_res[g_id-1])
         for k in goals_per_class.keys():
             self.stats['# class_teacher {}'.format(k)].append(goals_per_class[k])
-            self.stats['# class_agent {}'.format(k)].append(agent_stats[k])
+            self.stats['# class_ag {}'.format(k)].append(agent_achieved_stats[k])
+            self.stats['# class_g {}'.format(k)].append(agent_target_stats[k])

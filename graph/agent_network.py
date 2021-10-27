@@ -37,8 +37,11 @@ class AgentNetwork():
                 # update agent count stats
                 try:
                     c = self.teacher.config_to_class[str(np.array(achieved_goal).reshape(1, -1))]
+                    c_t = self.teacher.config_to_class[str(np.array(goal).reshape(1, -1))]
                     if self.stats[c+1] < 10000: # avoid float limit instabilities
                         self.stats[c+1] += 1
+                    if self.target_stats[c_t+1] < 10000: # avoid float limit instabilities
+                        self.target_stats[c_t+1] += 1
                 except KeyError:
                     pass
 
@@ -166,6 +169,10 @@ class AgentNetwork():
             self.semantic_graph = SemanticGraph.load(self.exp_path+'/','temp')
 
     def init_stats(self):
+        # Counts of achieved goals per class
         self.stats = dict()
+        # Counts of targeted goals per class
+        self.target_stats = dict()
         for i in range(11):
             self.stats[i+1] = 0
+            self.target_stats[i+1] = 0

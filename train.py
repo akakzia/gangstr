@@ -171,8 +171,8 @@ def launch(args):
                 
                 agent_network.log(logger)
                 logger.record_tabular('replay_nb_edges', policy.buffer.get_nb_edges())
-                log_and_save(goal_sampler, synchronized_stats, sync_nb_ss, sync_nb_beyond, agent_network.stats, epoch, episode_count,
-                             av_res, global_sr, time_dict, nb_pairs_internalized)
+                log_and_save(goal_sampler, synchronized_stats, sync_nb_ss, sync_nb_beyond, agent_network.stats, agent_network.target_stats,
+                             epoch, episode_count, av_res, global_sr, time_dict, nb_pairs_internalized)
 
                 # Saving policy models
                 if epoch % args.save_freq == 0:
@@ -181,9 +181,9 @@ def launch(args):
                 if rank==0: logger.info('\tEpoch #{}: SR: {}'.format(epoch, global_sr))
 
 
-def log_and_save( goal_sampler, teacher_stats, proposed_ss, proposed_beyond, agent_stats, epoch, episode_count, av_res, global_sr,
-                  time_dict, nb_internalized):
-    goal_sampler.save(epoch, episode_count, av_res, global_sr, time_dict, teacher_stats, agent_stats,
+def log_and_save( goal_sampler, teacher_stats, proposed_ss, proposed_beyond, agent_achieved_stats, agent_target_stats, epoch, episode_count,
+                  av_res, global_sr, time_dict, nb_internalized):
+    goal_sampler.save(epoch, episode_count, av_res, global_sr, time_dict, teacher_stats, agent_achieved_stats, agent_target_stats,
                       nb_internalized, proposed_ss, proposed_beyond)
     for k, l in goal_sampler.stats.items():
         logger.record_tabular(k, l[-1])

@@ -12,7 +12,7 @@ epsilon = 1e-6
 
 class GnnCritic(nn.Module):
     def __init__(self, nb_objects, edges, incoming_edges, predicate_ids, aggregation, readout, dim_body, dim_object, dim_mp_input,
-                 dim_mp_output, dim_phi_critic_input, dim_phi_critic_output, dim_rho_critic_input, dim_rho_critic_output):
+                 dim_mp_output, dim_phi_critic_input, dim_phi_critic_output, dim_rho_critic_input, dim_rho_critic_output, ens_size):
         super(GnnCritic, self).__init__()
 
         self.nb_objects = nb_objects
@@ -25,8 +25,8 @@ class GnnCritic(nn.Module):
         self.readout = readout
 
         self.mp_critic = GnnMessagePassing(dim_mp_input, dim_mp_output)
-        self.phi_critic = PhiCriticDeepSet(dim_phi_critic_input, 256, dim_phi_critic_output)
-        self.rho_critic = RhoCriticDeepSet(dim_rho_critic_input, dim_rho_critic_output)
+        self.phi_critic = PhiCriticDeepSet(dim_phi_critic_input, 256, dim_phi_critic_output, nb_critics=ens_size)
+        self.rho_critic = RhoCriticDeepSet(dim_rho_critic_input, dim_rho_critic_output, nb_critics=ens_size)
 
         self.edges = edges
         self.incoming_edges = incoming_edges
@@ -56,7 +56,7 @@ class GnnCritic(nn.Module):
         output_phi_critic = self.phi_critic(inp)
         output_phi_critic = output_phi_critic.sum(dim=0)
         q_pi_tensor = self.rho_critic(output_phi_critic)
-        return q_pi_tensor[:, :-1], q_pi_tensor[:, -1:]
+        return q_pi_tensor
         # if self.readout == 'sum':
         #     output_phi_critic_1 = output_phi_critic_1.sum(dim=0)
         #     output_phi_critic_2 = output_phi_critic_2.sum(dim=0)
@@ -161,10 +161,11 @@ class GnnSemantic:
         self.aggregation = args.aggregation_fct
         self.readout = args.readout_fct
 
-        self.q1_pi_tensor = None
-        self.q2_pi_tensor = None
-        self.target_q1_pi_tensor = None
-        self.target_q2_pi_tensor = None
+        # If value disagreement algo, then consider 2 SAC critics + 3 Disagreement critics
+        self.critic_ensemble_size = 5 if args.algo == 'value_disagreement' else 2
+
+        self.q_pi_tensor = None
+        self.target_q_pi_tensor = None
         self.pi_tensor = None
         self.log_prob = None
 
@@ -186,10 +187,12 @@ class GnnSemantic:
 
         self.critic = GnnCritic(self.nb_objects, self.edges, self.incoming_edges, self.predicate_ids, self.aggregation,
                                 self.readout, self.dim_body, self.dim_object, dim_mp_input, dim_mp_output,
-                                dim_phi_critic_input, dim_phi_critic_output, dim_rho_critic_input, dim_rho_critic_output)
+                                dim_phi_critic_input, dim_phi_critic_output, dim_rho_critic_input, dim_rho_critic_output,
+                                self.critic_ensemble_size)
         self.critic_target = GnnCritic(self.nb_objects, self.edges, self.incoming_edges, self.predicate_ids, self.aggregation,
                                        self.readout, self.dim_body, self.dim_object, dim_mp_input, dim_mp_output,
-                                       dim_phi_critic_input, dim_phi_critic_output, dim_rho_critic_input, dim_rho_critic_output)
+                                       dim_phi_critic_input, dim_phi_critic_output, dim_rho_critic_input, dim_rho_critic_output,
+                                       self.critic_ensemble_size)
         self.actor = GnnActor(self.nb_objects, self.incoming_edges, self.aggregation, self.readout, self.dim_body, self.dim_object,
                               dim_phi_actor_input, dim_phi_actor_output, dim_rho_actor_input, dim_rho_actor_output)
 
@@ -206,9 +209,9 @@ class GnnSemantic:
         self.pi_tensor, self.log_prob, _ = self.actor.sample(obs, edge_features)
 
         if actions is not None:
-            self.q1_pi_tensor, self.q2_pi_tensor = self.critic.forward(obs, self.pi_tensor, edge_features)
+            self.q_pi_tensor = self.critic.forward(obs, self.pi_tensor, edge_features)
             return self.critic.forward(obs, actions, edge_features)
         else:
             with torch.no_grad():
-                self.target_q1_pi_tensor, self.target_q2_pi_tensor = self.critic_target.forward(obs, self.pi_tensor, edge_features)
-            self.q1_pi_tensor, self.q2_pi_tensor = None, None
+                self.target_q_pi_tensor = self.critic_target.forward(obs, self.pi_tensor, edge_features)
+            self.q_pi_tensor = None

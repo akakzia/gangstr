@@ -299,7 +299,8 @@ class HMERolloutWorker(RolloutWorker):
             # If no SP intervention
             t_i = time.time()
             if len(agent_network.semantic_graph.configs) > 0:
-                self.long_term_goal = agent_network.sample_goal_uniform(1, use_oracle=False)[0]
+                # self.long_term_goal = agent_network.sample_goal_uniform(1, use_oracle=False)[0]
+                self.long_term_goal = self.goal_sampler.sample_goal(agent_network, self.last_obs)
             else:
                 self.long_term_goal = tuple(np.random.choice([-1., 1.], size=(1, self.goal_dim))[0])
 
