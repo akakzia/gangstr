@@ -52,18 +52,22 @@ class GnnCritic(nn.Module):
         else:
             raise NotImplementedError
 
-        output_phi_critic_1, output_phi_critic_2 = self.phi_critic(inp)
-        if self.readout == 'sum':
-            output_phi_critic_1 = output_phi_critic_1.sum(dim=0)
-            output_phi_critic_2 = output_phi_critic_2.sum(dim=0)
-        elif self.readout == 'mean':
-            output_phi_critic_1 = output_phi_critic_1.mean(dim=0)
-            output_phi_critic_2 = output_phi_critic_2.mean(dim=0)
-        elif self.readout == 'max':
-            output_phi_critic_1 = output_phi_critic_1.max(dim=0).values
-            output_phi_critic_2 = output_phi_critic_2.max(dim=0).values
-        q1_pi_tensor, q2_pi_tensor = self.rho_critic(output_phi_critic_1, output_phi_critic_2)
-        return q1_pi_tensor, q2_pi_tensor
+        # output_phi_critic_1, output_phi_critic_2 = self.phi_critic(inp)
+        output_phi_critic = self.phi_critic(inp)
+        output_phi_critic = output_phi_critic.sum(dim=0)
+        q_pi_tensor = self.rho_critic(output_phi_critic)
+        return q_pi_tensor[:, :-1], q_pi_tensor[:, -1:]
+        # if self.readout == 'sum':
+        #     output_phi_critic_1 = output_phi_critic_1.sum(dim=0)
+        #     output_phi_critic_2 = output_phi_critic_2.sum(dim=0)
+        # elif self.readout == 'mean':
+        #     output_phi_critic_1 = output_phi_critic_1.mean(dim=0)
+        #     output_phi_critic_2 = output_phi_critic_2.mean(dim=0)
+        # elif self.readout == 'max':
+        #     output_phi_critic_1 = output_phi_critic_1.max(dim=0).values
+        #     output_phi_critic_2 = output_phi_critic_2.max(dim=0).values
+        # q1_pi_tensor, q2_pi_tensor = self.rho_critic(output_phi_critic_1, output_phi_critic_2)
+        # return q1_pi_tensor, q2_pi_tensor
 
     def message_passing(self, obs, ag, g):
         batch_size = obs.shape[0]
