@@ -151,8 +151,8 @@ class RhoActorDeepSet(nn.Module):
 class PhiCriticDeepSet(nn.Module):
     def __init__(self, inp, hid, out, nb_critics=2):
         super(PhiCriticDeepSet, self).__init__()
-        self.linear1 = nn.Linear(inp, hid)
-        self.linear2 = nn.Linear(hid, out)
+        self.linear1 = nn.Linear(inp, 2*hid)
+        self.linear2 = nn.Linear(2*hid, 2*out)
 
         # self.linear4 = nn.Linear(inp, hid)
         # self.linear5 = nn.Linear(hid, out)
@@ -172,7 +172,7 @@ class PhiCriticDeepSet(nn.Module):
 class RhoCriticDeepSet(nn.Module):
     def __init__(self, inp, out, nb_critics=2):
         super(RhoCriticDeepSet, self).__init__()
-        self.linear1 = nn.Linear(inp, nb_critics*256)
+        self.linear1 = nn.Linear(2*inp, nb_critics*256)
         self.linear3 = nn.Linear(nb_critics*256, nb_critics*out)
 
         # self.linear4 = nn.Linear(inp, 256)
