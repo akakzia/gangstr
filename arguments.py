@@ -16,7 +16,7 @@ def get_args():
     parser.add_argument('--num-workers', type=int, default=MPI.COMM_WORLD.Get_size(), help='the number of cpus to collect samples')
     parser.add_argument('--cuda', action='store_true', help='if use gpu do the acceleration')
     # the environment arguments
-    parser.add_argument('--algo', type=str, default='semantic', help="'semantic', 'continuous', 'language'")
+    parser.add_argument('--algo', type=str, default='hme', help="'hme', 'value_disagreement', 'lp'")
     parser.add_argument('--agent', type=str, default='SAC', help='the RL algorithm name')
     parser.add_argument('--n-blocks', type=int, default=5, help='The number of blocks to be considered in the FetchManipulate env')
     # the training arguments
