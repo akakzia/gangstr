@@ -1,9 +1,10 @@
+import torch
 import numpy as np
 from utils import get_idxs_per_relation
 from mpi4py import MPI
 
 class GoalSampler:
-    def __init__(self, args):
+    def __init__(self, args, policy):
         self.num_rollouts_per_mpi = args.num_rollouts_per_mpi
         self.rank = MPI.COMM_WORLD.Get_rank()
 
@@ -13,32 +14,33 @@ class GoalSampler:
         self.discovered_goals = []
         self.discovered_goals_str = []
 
+        self.algo = args.algo
+        self.policy = policy
         self.init_stats()
 
-    def sample_goal(self, n_goals, evaluation):
+    def sample_goal(self, agent_network, initial_obs):
         """
-        Sample n_goals goals to be targeted during rollouts
-        evaluation controls whether or not to sample the goal uniformly or according to curriculum
+
         """
-        if evaluation and len(self.discovered_goals) > 0:
-            goals = np.random.choice(self.discovered_goals, size=self.num_rollouts_per_mpi)
-            masks = np.zeros((n_goals, self.goal_dim))
-            self_eval = False
+        if self.algo == 'hme':
+            return agent_network.sample_goal_uniform(1, use_oracle=False)[0]
+        elif self.algo == 'value_disagreement':
+            n = min(1000, len(agent_network.semantic_graph.configs))
+            goals = np.array(agent_network.sample_goal_uniform(n, use_oracle=False))
+            observation = np.repeat(np.expand_dims(initial_obs['observation'], axis=0), n, axis=0)
+            ag = np.repeat(np.expand_dims(initial_obs['achieved_goal'], axis=0), n, axis=0)
+
+            obs_norm = self.policy.o_norm.normalize(observation)
+            g_norm = self.policy.g_norm.normalize(goals)
+            ag_norm = self.policy.g_norm.normalize(ag)
+
+            obs_norm_tensor = torch.tensor(obs_norm, dtype=torch.float32)
+            g_norm_tensor = torch.tensor(g_norm, dtype=torch.float32)
+            ag_norm_tensor = torch.tensor(ag_norm, dtype=torch.float32)
+
+            raise NotImplementedError
         else:
-            if len(self.discovered_goals) == 0:
-                goals = np.random.choice([-1., 1.], size=(n_goals, self.goal_dim))
-                masks = np.zeros((n_goals, self.goal_dim))
-                # masks = np.random.choice([0., 1.], size=(n_goals, self.goal_dim))
-                self_eval = False
-            # if no curriculum learning
-            else:
-                # sample uniformly from discovered goals
-                goal_ids = np.random.choice(range(len(self.discovered_goals)), size=n_goals)
-                goals = np.array(self.discovered_goals)[goal_ids]
-                masks = self.sample_masks(n_goals)
-                # masks = np.array(self.masks_list)[np.random.choice(range(self.n_masks), size=n_goals)]
-                self_eval = False
-        return goals, masks, self_eval
+            raise NotImplementedError
 
     def update(self, episodes, t):
         """

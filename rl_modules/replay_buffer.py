@@ -4,11 +4,10 @@ import numpy as np
 import random
 
 class ReplayBuffer:
-    def __init__(self, env_params, buffer_size, sample_func, goal_sampler,args):
+    def __init__(self, env_params, buffer_size, sample_func, args):
         self.env_params = env_params
         self.T = args.episode_duration
         self.size = buffer_size // self.T
-        self.goal_sampler = goal_sampler
 
         self.sample_func = sample_func
 

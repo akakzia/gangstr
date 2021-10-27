@@ -59,13 +59,13 @@ def launch(args):
 
     args.env_params = get_env_params(env)
 
-    goal_sampler = GoalSampler(args)
-
     # Initialize RL Agent
     if args.agent == "SAC":
-        policy = RLAgent(args, env.compute_reward, goal_sampler)
+        policy = RLAgent(args, env.compute_reward)
     else:
         raise NotImplementedError
+
+    goal_sampler = GoalSampler(args, policy)
 
     # Initialize Rollout Worker
     rollout_worker = HMERolloutWorker(env, policy, goal_sampler,  args)
@@ -209,4 +209,9 @@ if __name__ == '__main__':
     # Get parameters
     args = get_args()
 
+    assert args.algo in ['hme', 'value_disagreement', 'lp'], "The algorithm argument {} is not recognized".format(args.algo)
+
+    if args.algo != 'hme':
+        args.intervention_prob = 0.0
+        args.internalization_prob = 0.0
     launch(args)

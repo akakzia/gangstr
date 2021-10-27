@@ -17,12 +17,10 @@ def hard_update(target, source):
 
 
 class RLAgent:
-    def __init__(self, args, compute_rew, goal_sampler):
+    def __init__(self, args, compute_rew):
         self.args = args
         self.alpha = args.alpha
         self.env_params = args.env_params
-
-        self.goal_sampler = goal_sampler
 
         self.total_iter = 0
 
@@ -73,7 +71,6 @@ class RLAgent:
         self.buffer = ReplayBuffer(env_params=self.env_params,
                                    buffer_size=self.args.buffer_size,
                                    sample_func=self.her_module.sample_her_transitions,
-                                   goal_sampler=self.goal_sampler,
                                    args=args)
 
     def act(self, obs, ag, g, no_noise):
