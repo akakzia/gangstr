@@ -38,9 +38,9 @@ class AgentNetwork():
                 try:
                     c = self.teacher.config_to_class[str(np.array(achieved_goal).reshape(1, -1))]
                     c_t = self.teacher.config_to_class[str(np.array(goal).reshape(1, -1))]
-                    if self.stats[c+1] < 10000: # avoid float limit instabilities
+                    if self.stats[c+1] < 1000000: # avoid float limit instabilities
                         self.stats[c+1] += 1
-                    if self.target_stats[c_t+1] < 10000: # avoid float limit instabilities
+                    if self.target_stats[c_t+1] < 1000000: # avoid float limit instabilities
                         self.target_stats[c_t+1] += 1
                 except KeyError:
                     pass

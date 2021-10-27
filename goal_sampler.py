@@ -40,8 +40,10 @@ class GoalSampler:
 
             with torch.no_grad():
                 self.policy.model.forward_pass(obs_norm_tensor, ag_norm_tensor, g_norm_tensor)
-                scores = np.std(self.policy.model.target_q_pi_tensor.numpy(), axis=1)**2
-            return tuple(goals[np.argmax(scores)])
+                scores = np.std(self.policy.model.target_q_pi_tensor[:, -3:].numpy(), axis=1)**2
+                normalized_scores = scores / np.sum(scores)
+                goal = goals[np.random.choice(np.arange(n), p=normalized_scores)]
+            return tuple(goal)
         else:
             raise NotImplementedError
 
