@@ -40,13 +40,18 @@ class RLAgent:
         # sync the networks across the CPUs
         sync_networks(self.model.critic)
         sync_networks(self.model.actor)
+        sync_networks(self.model.vds_q_values)
         hard_update(self.model.critic_target, self.model.critic)
+        hard_update(self.model.vds_target_q_values, self.model.vds_q_values)
         sync_networks(self.model.critic_target)
 
         # create the optimizer
         self.policy_optim = torch.optim.Adam(list(self.model.actor.parameters()),
                                              lr=self.args.lr_actor)
         self.critic_optim = torch.optim.Adam(list(self.model.critic.parameters()),
+                                             lr=self.args.lr_critic)
+
+        self.vds_optim = torch.optim.Adam(list(self.model.vds_q_values.parameters()),
                                              lr=self.args.lr_critic)
 
         # create the normalizer
@@ -110,6 +115,7 @@ class RLAgent:
         # soft update
         if self.total_iter % self.freq_target_update == 0:
             self._soft_update_target_network(self.model.critic_target, self.model.critic)
+            self._soft_update_target_network(self.model.vds_target_q_values, self.model.vds_q_values)
 
     # update the normalizer
     def _update_normalizer(self, episode):
@@ -173,7 +179,7 @@ class RLAgent:
         obs_next_norm = self.o_norm.normalize(transitions['obs_next'])
         ag_next_norm = self.g_norm.normalize(transitions['ag_next'])
 
-        self.alpha = update_networks(self.model, self.policy_optim, self.critic_optim, self.alpha, self.log_alpha,
+        self.alpha = update_networks(self.model, self.vds_optim, self.policy_optim, self.critic_optim, self.alpha, self.log_alpha,
                                      self.target_entropy, self.alpha_optim, obs_norm, ag_norm, g_norm, obs_next_norm, ag_next_norm,
                                      actions, rewards, self.args)
 

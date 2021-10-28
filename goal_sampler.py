@@ -40,7 +40,10 @@ class GoalSampler:
 
             with torch.no_grad():
                 self.policy.model.forward_pass(obs_norm_tensor, ag_norm_tensor, g_norm_tensor)
-                scores = np.std(self.policy.model.target_q_vd_tensor.numpy(), axis=1)**2
+                qf1_vd, qf2_vd, qf3_vd = self.policy.model.target_q1_vd_tensor.numpy(), self.policy.model.target_q2_vd_tensor.numpy(),\
+                                         self.policy.model.target_q3_vd_tensor.numpy()
+                qs = np.concatenate([qf1_vd, qf2_vd, qf3_vd], axis=1)
+                scores = np.std(qs, axis=1)**2
                 normalized_scores = scores / np.sum(scores)
                 goal = goals[np.random.choice(np.arange(n), p=normalized_scores)]
             return tuple(goal)

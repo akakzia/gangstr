@@ -19,7 +19,7 @@ def update_entropy(alpha, log_alpha, target_entropy, log_pi, alpha_optim, args):
 
     return alpha, alpha_loss, alpha_tlogs
 
-def update_networks(model, policy_optim, critic_optim, alpha, log_alpha, target_entropy, alpha_optim, obs_norm, ag_norm, g_norm,
+def update_networks(model, vds_optim, policy_optim, critic_optim, alpha, log_alpha, target_entropy, alpha_optim, obs_norm, ag_norm, g_norm,
                     obs_next_norm, ag_next_norm, actions, rewards, args):
     # Tensorize
     obs_norm_tensor = torch.tensor(obs_norm, dtype=torch.float32)
@@ -43,32 +43,25 @@ def update_networks(model, policy_optim, critic_optim, alpha, log_alpha, target_
     with torch.no_grad():
         model.forward_pass(obs_next_norm_tensor, ag_next_norm_tensor, g_norm_tensor)
         actions_next, log_pi_next = model.pi_tensor, model.log_prob
-        # qf1_next_target, qf2_next_target = model.target_q1_pi_tensor, model.target_q2_pi_tensor
-        qf1_next_target, qf2_next_target = model.target_q_pi_tensor[:, 0:1], model.target_q_pi_tensor[:, 1:2]
+        qf1_next_target, qf2_next_target = model.target_q1_pi_tensor, model.target_q2_pi_tensor
         if args.algo == 'value_disagreement':
-            qf1_vd_next_target, qf2_vd_next_target, qf3_vd_next_target = model.target_q_vd_tensor[:, 0:1], model.target_q_vd_tensor[:, 1:2],\
-                                                                         model.target_q_vd_tensor[:, 2:3]
+            qf1_vd_next_target, qf2_vd_next_target, qf3_vd_next_target = model.target_q1_vd_tensor, model.target_q2_vd_tensor, \
+                                                                         model.target_q3_vd_tensor
         min_qf_next_target = torch.min(qf1_next_target, qf2_next_target) - alpha * log_pi_next
         next_q_value = r_tensor + args.gamma * min_qf_next_target
 
     # the q loss
-    # qf1, qf2 = model.forward_pass(obs_norm_tensor, ag_norm_tensor, g_norm_tensor, actions=actions_tensor)
-    qf_act, qf_vd_act = model.forward_pass(obs_norm_tensor, ag_norm_tensor, g_norm_tensor, actions=actions_tensor)
-    qf1, qf2 = qf_act[:, 0:1], qf_act[:, 1:2]
+    qf1, qf2, _ = model.forward_pass(obs_norm_tensor, ag_norm_tensor, g_norm_tensor, actions=actions_tensor)
+    # qf_act, qf_vd_act = model.forward_pass(obs_norm_tensor, ag_norm_tensor, g_norm_tensor, actions=actions_tensor)
+    # qf1, qf2 = qf_act[:, 0:1], qf_act[:, 1:2]
     qf1_loss = F.mse_loss(qf1, next_q_value)
     qf2_loss = F.mse_loss(qf2, next_q_value)
     qf_loss = qf1_loss + qf2_loss
-    if args.algo == 'value_disagreement':
-        qf1_vd, qf2_vd, qf3_vd = qf_vd_act[:, 0:1], qf_vd_act[:, 1:2], qf_vd_act[:, 2:3]
-        qf1_vd_loss = F.mse_loss(qf1_vd, qf1_vd_next_target)
-        qf2_vd_loss = F.mse_loss(qf2_vd, qf2_vd_next_target)
-        qf3_vd_loss = F.mse_loss(qf3_vd, qf3_vd_next_target)
-        qf_loss = qf_loss + qf1_vd_loss + qf2_vd_loss + qf3_vd_loss
 
     # the actor loss
     pi, log_pi = model.pi_tensor, model.log_prob
-    # qf1_pi, qf2_pi = model.q1_pi_tensor, model.q2_pi_tensor
-    qf1_pi, qf2_pi = model.q_pi_tensor[:, 0:1], model.q_pi_tensor[:, 1:2]
+    qf1_pi, qf2_pi = model.q1_pi_tensor, model.q2_pi_tensor
+    # qf1_pi, qf2_pi = model.q_pi_tensor[:, 0:1], model.q_pi_tensor[:, 1:2]
     min_qf_pi = torch.min(qf1_pi, qf2_pi)
     policy_loss = ((alpha * log_pi) - min_qf_pi).mean()
 
@@ -83,6 +76,20 @@ def update_networks(model, policy_optim, critic_optim, alpha, log_alpha, target_
     qf_loss.backward()
     sync_grads(model.critic)
     critic_optim.step()
+
+    if args.algo == 'value_disagreement':
+        # qf1_vd, qf2_vd, qf3_vd = qf_vd_act[:, 0:1], qf_vd_act[:, 1:2], qf_vd_act[:, 2:3]
+        qf1_vd, qf2_vd, qf3_vd = model.q1_vd_tensor, model.q2_vd_tensor, model.q3_vd_tensor
+        qf1_vd_loss = F.mse_loss(qf1_vd, qf1_vd_next_target)
+        qf2_vd_loss = F.mse_loss(qf2_vd, qf2_vd_next_target)
+        qf3_vd_loss = F.mse_loss(qf3_vd, qf3_vd_next_target)
+        qf_vds_loss = qf1_vd_loss + qf2_vd_loss + qf3_vd_loss
+
+        # update the vds_network
+        vds_optim.zero_grad()
+        qf_vds_loss.backward()
+        sync_grads(model.vds_q_values)
+        vds_optim.step()
 
     alpha, alpha_loss, alpha_tlogs = update_entropy(alpha, log_alpha, target_entropy, log_pi, alpha_optim, args)
 

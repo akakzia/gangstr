@@ -4,10 +4,19 @@ import torch.nn.functional as F
 from torch.distributions import Normal
 from itertools import permutations
 import numpy as np
-from rl_modules.networks import GnnMessagePassing, PhiCriticDeepSet, PhiActorDeepSet, RhoActorDeepSet, RhoCriticDeepSet
+from rl_modules.networks import GnnMessagePassing, PhiCriticDeepSet, PhiActorDeepSet, RhoActorDeepSet, RhoCriticDeepSet, VdRhoCriticDeepSet
 from utils import get_graph_structure
 
 epsilon = 1e-6
+
+class ValueDisagreementGnn(nn.Module):
+    def __init__(self, dim_rho_critic_input, dim_rho_critic_output):
+        super(ValueDisagreementGnn, self).__init__()
+
+        self.rho_vds = VdRhoCriticDeepSet(dim_rho_critic_input, dim_rho_critic_output)
+
+    def forward(self, inp):
+        return self.rho_vds(inp)
 
 
 class GnnCritic(nn.Module):
@@ -25,8 +34,10 @@ class GnnCritic(nn.Module):
         self.readout = readout
 
         self.mp_critic = GnnMessagePassing(dim_mp_input, dim_mp_output)
-        self.phi_critic = PhiCriticDeepSet(dim_phi_critic_input, 256, dim_phi_critic_output, nb_critics=ens_size)
-        self.rho_critic = RhoCriticDeepSet(dim_rho_critic_input, dim_rho_critic_output, nb_critics=ens_size)
+        self.phi_critic = PhiCriticDeepSet(dim_phi_critic_input, 256, dim_phi_critic_output)
+        self.rho_critic = RhoCriticDeepSet(dim_rho_critic_input, dim_rho_critic_output)
+
+
 
         self.edges = edges
         self.incoming_edges = incoming_edges
@@ -52,22 +63,24 @@ class GnnCritic(nn.Module):
         else:
             raise NotImplementedError
 
-        # output_phi_critic_1, output_phi_critic_2 = self.phi_critic(inp)
-        output_phi_critic = self.phi_critic(inp)
-        output_phi_critic = output_phi_critic.sum(dim=0)
-        q_pi_tensor, q_vd_tensor = self.rho_critic(output_phi_critic, output_phi_critic[:, :output_phi_critic.shape[-1]//2])
-        return q_pi_tensor, q_vd_tensor
-        # if self.readout == 'sum':
-        #     output_phi_critic_1 = output_phi_critic_1.sum(dim=0)
-        #     output_phi_critic_2 = output_phi_critic_2.sum(dim=0)
-        # elif self.readout == 'mean':
-        #     output_phi_critic_1 = output_phi_critic_1.mean(dim=0)
-        #     output_phi_critic_2 = output_phi_critic_2.mean(dim=0)
-        # elif self.readout == 'max':
-        #     output_phi_critic_1 = output_phi_critic_1.max(dim=0).values
-        #     output_phi_critic_2 = output_phi_critic_2.max(dim=0).values
-        # q1_pi_tensor, q2_pi_tensor = self.rho_critic(output_phi_critic_1, output_phi_critic_2)
-        # return q1_pi_tensor, q2_pi_tensor
+
+        # output_phi_critic = self.phi_critic(inp)
+        # output_phi_critic = output_phi_critic.sum(dim=0)
+        # q_pi_tensor, q_vd_tensor = self.rho_critic(output_phi_critic, output_phi_critic[:, :output_phi_critic.shape[-1]//2])
+        # return q_pi_tensor, q_vd_tensor
+
+        output_phi_critic_1, output_phi_critic_2 = self.phi_critic(inp)
+        if self.readout == 'sum':
+            output_phi_critic_1 = output_phi_critic_1.sum(dim=0)
+            output_phi_critic_2 = output_phi_critic_2.sum(dim=0)
+        elif self.readout == 'mean':
+            output_phi_critic_1 = output_phi_critic_1.mean(dim=0)
+            output_phi_critic_2 = output_phi_critic_2.mean(dim=0)
+        elif self.readout == 'max':
+            output_phi_critic_1 = output_phi_critic_1.max(dim=0).values
+            output_phi_critic_2 = output_phi_critic_2.max(dim=0).values
+        q1_pi_tensor, q2_pi_tensor = self.rho_critic(output_phi_critic_1, output_phi_critic_2)
+        return q1_pi_tensor, q2_pi_tensor, output_phi_critic_1.detach()
 
     def message_passing(self, obs, ag, g):
         batch_size = obs.shape[0]
@@ -164,12 +177,20 @@ class GnnSemantic:
         # If value disagreement algo, then consider 2 SAC critics + 3 Disagreement critics
         self.critic_ensemble_size = 3 if args.algo == 'value_disagreement' else 2
 
-        self.q_pi_tensor = None
-        self.q_vd_tensor = None
-        self.target_q_pi_tensor = None
-        self.target_q_vd_tensor = None
+        self.q1_pi_tensor = None
+        self.q2_pi_tensor = None
+        self.target_q1_pi_tensor = None
+        self.target_q2_pi_tensor = None
         self.pi_tensor = None
         self.log_prob = None
+
+        self.q1_vd_tensor = None
+        self.q2_vd_tensor = None
+        self.q3_vd_tensor = None
+
+        self.target_q1_vd_tensor = None
+        self.target_q2_vd_tensor = None
+        self.target_q3_vd_tensor = None
 
         # Process indexes for graph construction
         self.edges, self.incoming_edges, self.predicate_ids = get_graph_structure(self.nb_objects)
@@ -195,6 +216,10 @@ class GnnSemantic:
                                        self.readout, self.dim_body, self.dim_object, dim_mp_input, dim_mp_output,
                                        dim_phi_critic_input, dim_phi_critic_output, dim_rho_critic_input, dim_rho_critic_output,
                                        self.critic_ensemble_size)
+
+        self.vds_q_values = ValueDisagreementGnn(dim_rho_critic_input, dim_rho_critic_output)
+        self.vds_target_q_values = ValueDisagreementGnn(dim_rho_critic_input, dim_rho_critic_output)
+
         self.actor = GnnActor(self.nb_objects, self.incoming_edges, self.aggregation, self.readout, self.dim_body, self.dim_object,
                               dim_phi_actor_input, dim_phi_actor_output, dim_rho_actor_input, dim_rho_actor_output)
 
@@ -211,10 +236,11 @@ class GnnSemantic:
         self.pi_tensor, self.log_prob, _ = self.actor.sample(obs, edge_features)
 
         if actions is not None:
-            self.q_pi_tensor, self.q_vd_tensor = self.critic.forward(obs, self.pi_tensor, edge_features)
+            self.q1_pi_tensor, self.q2_pi_tensor, input_vds = self.critic.forward(obs, self.pi_tensor, edge_features)
+            self.q1_vd_tensor, self.q2_vd_tensor, self.q3_vd_tensor = self.vds_q_values.forward(input_vds)
             return self.critic.forward(obs, actions, edge_features)
         else:
             with torch.no_grad():
-                self.target_q_pi_tensor, self.target_q_vd_tensor = self.critic_target.forward(obs, self.pi_tensor, edge_features)
-            self.q_pi_tensor = None
-            self.q_vd_tensor = None
+                self.target_q1_pi_tensor, self.target_q2_pi_tensor, input_vds = self.critic_target.forward(obs, self.pi_tensor, edge_features)
+                self.target_q1_vd_tensor, self.target_q2_vd_tensor, self.target_q3_vd_tensor = self.vds_target_q_values.forward(input_vds)
+            self.q1_pi_tensor, self.q2_pi_tensor = None, None

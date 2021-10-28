@@ -149,13 +149,13 @@ class RhoActorDeepSet(nn.Module):
 
 
 class PhiCriticDeepSet(nn.Module):
-    def __init__(self, inp, hid, out, nb_critics=2):
+    def __init__(self, inp, hid, out):
         super(PhiCriticDeepSet, self).__init__()
-        self.linear1 = nn.Linear(inp, 2*hid)
-        self.linear2 = nn.Linear(2*hid, 2*out)
+        self.linear1 = nn.Linear(inp, hid)
+        self.linear2 = nn.Linear(hid, out)
 
-        # self.linear4 = nn.Linear(inp, hid)
-        # self.linear5 = nn.Linear(hid, out)
+        self.linear3 = nn.Linear(inp, hid)
+        self.linear4 = nn.Linear(hid, out)
 
         self.apply(weights_init_)
 
@@ -163,37 +163,57 @@ class PhiCriticDeepSet(nn.Module):
         x1 = F.relu(self.linear1(inp))
         x1 = F.relu(self.linear2(x1))
 
-        # x2 = F.relu(self.linear4(inp))
-        # x2 = F.relu(self.linear5(x2))
+        x2 = F.relu(self.linear3(inp))
+        x2 = F.relu(self.linear4(x2))
 
-        return x1
+        return x1, x2
 
 
 class RhoCriticDeepSet(nn.Module):
-    def __init__(self, inp, out, nb_critics=2):
+    def __init__(self, inp, out):
         super(RhoCriticDeepSet, self).__init__()
-        self.linear1 = nn.Linear(2*inp, 2*256)
-        self.linear2 = nn.Linear(2*256, 2*out)
+        self.linear1 = nn.Linear(inp, 256)
+        self.linear2 = nn.Linear(256, out)
 
-        self.linear3 = nn.Linear(inp, nb_critics * 256)
-        self.linear4 = nn.Linear(nb_critics * 256, nb_critics * out)
-
-        # self.linear4 = nn.Linear(inp, 256)
-        # self.linear6 = nn.Linear(256, out)
+        self.linear3 = nn.Linear(inp, 256)
+        self.linear4 = nn.Linear(256, out)
 
         self.apply(weights_init_)
 
-    def forward(self, inp1, inp_vd):
+    def forward(self, inp1, inp2):
         x1 = F.relu(self.linear1(inp1))
         x1 = self.linear2(x1)
 
-        x2 = F.relu(self.linear3(inp_vd))
+        x2 = F.relu(self.linear3(inp2))
         x2 = self.linear4(x2)
 
-        # x2 = F.relu(self.linear4(inp2))
-        # x2 = self.linear6(x2)
-
         return x1, x2
+
+class VdRhoCriticDeepSet(nn.Module):
+    def __init__(self, inp, out):
+        super(VdRhoCriticDeepSet, self).__init__()
+        self.linear1 = nn.Linear(inp, 256)
+        self.linear2 = nn.Linear(256, out)
+
+        self.linear3 = nn.Linear(inp, 256)
+        self.linear4 = nn.Linear(256, out)
+
+        self.linear5 = nn.Linear(inp, 256)
+        self.linear6 = nn.Linear(256, out)
+
+        self.apply(weights_init_)
+
+    def forward(self, inp):
+        x1 = F.relu(self.linear1(inp))
+        x1 = self.linear2(x1)
+
+        x2 = F.relu(self.linear3(inp))
+        x2 = self.linear4(x2)
+
+        x3 = F.relu(self.linear5(inp))
+        x3 = self.linear6(x3)
+
+        return x1, x2, x3
 
 
 class GnnAttention(nn.Module):
