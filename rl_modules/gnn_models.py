@@ -55,8 +55,8 @@ class GnnCritic(nn.Module):
         # output_phi_critic_1, output_phi_critic_2 = self.phi_critic(inp)
         output_phi_critic = self.phi_critic(inp)
         output_phi_critic = output_phi_critic.sum(dim=0)
-        q_pi_tensor = self.rho_critic(output_phi_critic)
-        return q_pi_tensor
+        q_pi_tensor, q_vd_tensor = self.rho_critic(output_phi_critic, output_phi_critic[:, :output_phi_critic.shape[-1]//2])
+        return q_pi_tensor, q_vd_tensor
         # if self.readout == 'sum':
         #     output_phi_critic_1 = output_phi_critic_1.sum(dim=0)
         #     output_phi_critic_2 = output_phi_critic_2.sum(dim=0)
@@ -162,10 +162,12 @@ class GnnSemantic:
         self.readout = args.readout_fct
 
         # If value disagreement algo, then consider 2 SAC critics + 3 Disagreement critics
-        self.critic_ensemble_size = 5 if args.algo == 'value_disagreement' else 2
+        self.critic_ensemble_size = 3 if args.algo == 'value_disagreement' else 2
 
         self.q_pi_tensor = None
+        self.q_vd_tensor = None
         self.target_q_pi_tensor = None
+        self.target_q_vd_tensor = None
         self.pi_tensor = None
         self.log_prob = None
 
@@ -209,9 +211,10 @@ class GnnSemantic:
         self.pi_tensor, self.log_prob, _ = self.actor.sample(obs, edge_features)
 
         if actions is not None:
-            self.q_pi_tensor = self.critic.forward(obs, self.pi_tensor, edge_features)
+            self.q_pi_tensor, self.q_vd_tensor = self.critic.forward(obs, self.pi_tensor, edge_features)
             return self.critic.forward(obs, actions, edge_features)
         else:
             with torch.no_grad():
-                self.target_q_pi_tensor = self.critic_target.forward(obs, self.pi_tensor, edge_features)
+                self.target_q_pi_tensor, self.target_q_vd_tensor = self.critic_target.forward(obs, self.pi_tensor, edge_features)
             self.q_pi_tensor = None
+            self.q_vd_tensor = None

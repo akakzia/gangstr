@@ -172,22 +172,28 @@ class PhiCriticDeepSet(nn.Module):
 class RhoCriticDeepSet(nn.Module):
     def __init__(self, inp, out, nb_critics=2):
         super(RhoCriticDeepSet, self).__init__()
-        self.linear1 = nn.Linear(2*inp, nb_critics*256)
-        self.linear3 = nn.Linear(nb_critics*256, nb_critics*out)
+        self.linear1 = nn.Linear(2*inp, 2*256)
+        self.linear2 = nn.Linear(2*256, 2*out)
+
+        self.linear3 = nn.Linear(inp, nb_critics * 256)
+        self.linear4 = nn.Linear(nb_critics * 256, nb_critics * out)
 
         # self.linear4 = nn.Linear(inp, 256)
         # self.linear6 = nn.Linear(256, out)
 
         self.apply(weights_init_)
 
-    def forward(self, inp1):
+    def forward(self, inp1, inp_vd):
         x1 = F.relu(self.linear1(inp1))
-        x1 = self.linear3(x1)
+        x1 = self.linear2(x1)
+
+        x2 = F.relu(self.linear3(inp_vd))
+        x2 = self.linear4(x2)
 
         # x2 = F.relu(self.linear4(inp2))
         # x2 = self.linear6(x2)
 
-        return x1
+        return x1, x2
 
 
 class GnnAttention(nn.Module):
