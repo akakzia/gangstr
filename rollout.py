@@ -65,7 +65,7 @@ class RolloutWorker:
         end_episodes = []
         for goal in goals : 
             self.reset()
-            _,last_episode = self.guided_rollout(goal,True, agent_network, episode_duration, animated=animated)
+            _,last_episode = self.guided_rollout(goal,True, False, agent_network, episode_duration, animated=animated)
             end_episodes.append(last_episode)
         self.reset()
         return end_episodes
@@ -90,7 +90,7 @@ class RolloutWorker:
         self.reset()
         return end_episodes
 
-    def guided_rollout(self,goal,evaluation,agent_network:AgentNetwork,episode_duration,episode_budget=None, animated=False):
+    def guided_rollout(self,goal,evaluation, self_eval, agent_network:AgentNetwork,episode_duration,episode_budget=None, animated=False):
         episodes = []
         goal = tuple(goal)
 
@@ -103,7 +103,7 @@ class RolloutWorker:
         while True:
             current_goal,goal_dist = self.get_next_goal(agent_network,goal,evaluation)
                 
-            episode = self.generate_one_rollout(current_goal, evaluation, episode_duration, animated=animated)
+            episode = self.generate_one_rollout(current_goal, evaluation, self_eval, episode_duration, animated=animated)
             episodes.append(episode)
             self.current_goal_id+=1
             
@@ -121,7 +121,7 @@ class RolloutWorker:
 
         return episodes,self.last_episode
 
-    def generate_one_rollout(self, goal,evaluation, episode_duration, animated=False):
+    def generate_one_rollout(self, goal,evaluation, self_eval, episode_duration, animated=False):
         g = np.array(goal)
         self.env.unwrapped.target_goal = np.array(goal)
         self.env.unwrapped.binary_goal = np.array(goal)
@@ -166,7 +166,7 @@ class RolloutWorker:
                         ag=np.array(ep_ag).copy(),
                         success=np.array(ep_success).copy(),
                         rewards=np.array(ep_rewards).copy(),
-                        self_eval=evaluation)
+                        self_eval=self_eval)
 
         self.last_obs = observation_new
         self.last_episode = episode
@@ -299,27 +299,27 @@ class HMERolloutWorker(RolloutWorker):
             # If no SP intervention
             t_i = time.time()
             if len(agent_network.semantic_graph.configs) > 0:
-                self.long_term_goal = agent_network.sample_goal_uniform(1, use_oracle=False)[0]
+                # self.long_term_goal = agent_network.sample_goal_uniform(1, use_oracle=False)[0]
+                self.long_term_goal, self_eval = self.goal_sampler.sample_goal(agent_network, initial_obs=None)
             else:
                 self.long_term_goal = tuple(np.random.choice([-1., 1.], size=(1, self.goal_dim))[0])
+                self_eval = False
 
             if time_dict is not None:
                 time_dict['goal_sampler'] += time.time() - t_i
             if (agent_network.semantic_graph.hasNode(self.long_term_goal)
                     and agent_network.semantic_graph.hasNode(self.current_config)
                     and self.long_term_goal != self.current_config):
-                new_episodes, _ = self.guided_rollout(self.long_term_goal, evaluation=False,
+                new_episodes, _ = self.guided_rollout(self.long_term_goal, evaluation=False, self_eval=self_eval,
                                                       agent_network=agent_network, episode_duration=self.episode_duration,
                                                       episode_budget=self.max_episodes - len(all_episodes))
             else:
-                new_episodes = [self.generate_one_rollout(self.long_term_goal, False, self.episode_duration)]
+                new_episodes = [self.generate_one_rollout(self.long_term_goal, False, self_eval, self.episode_duration)]
             all_episodes += new_episodes
-            # if all_episodes[-1]['success'][-1]:
-            #     before_last_goal = tuple(all_episodes[-1]['ag'][0])
-            #     last_goal = tuple(all_episodes[-1]['ag'][-1])
-            #     if (before_last_goal, last_goal) in self.stepping_stones_beyond_pairs_list:
-            #         self.to_remove_individual.append((before_last_goal, last_goal))
             self.reset()
+        if len(agent_network.semantic_graph.configs) > 0:
+            self.goal_sampler.update_lp(agent_network)
+            self.goal_sampler.sync()
         return all_episodes
 
     def internalize_social_episodes(self, agent_network, time_dict):

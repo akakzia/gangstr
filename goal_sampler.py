@@ -1,4 +1,4 @@
-import torch
+import random
 import numpy as np
 from utils import get_idxs_per_relation
 from mpi4py import MPI
@@ -14,6 +14,14 @@ class GoalSampler:
         self.discovered_goals = []
         self.discovered_goals_str = []
 
+        self.num_buckets = 11
+        self.LP = np.zeros([self.num_buckets])
+        self.C = np.zeros([self.num_buckets])
+        self.p = np.zeros([self.num_buckets])
+
+        self.self_eval_prob = 0.1  # probability to perform self evaluation
+        self.queue_len = 200
+
         self.algo = args.algo
         self.policy = policy
         self.init_stats()
@@ -25,47 +33,59 @@ class GoalSampler:
         if self.algo == 'hme':
             return agent_network.sample_goal_uniform(1, use_oracle=False)[0]
         elif self.algo == 'value_disagreement':
-            n = min(1000, len(agent_network.semantic_graph.configs))
-            goals = np.array(agent_network.sample_goal_uniform(n, use_oracle=False))
-            observation = np.repeat(np.expand_dims(initial_obs['observation'], axis=0), n, axis=0)
-            ag = np.repeat(np.expand_dims(initial_obs['achieved_goal'], axis=0), n, axis=0)
-
-            obs_norm = self.policy.o_norm.normalize(observation)
-            g_norm = self.policy.g_norm.normalize(goals)
-            ag_norm = self.policy.g_norm.normalize(ag)
-
-            obs_norm_tensor = torch.tensor(obs_norm, dtype=torch.float32)
-            g_norm_tensor = torch.tensor(g_norm, dtype=torch.float32)
-            ag_norm_tensor = torch.tensor(ag_norm, dtype=torch.float32)
-
             raise NotImplementedError
         else:
-            raise NotImplementedError
+            # Initialize LP probabilities
+            if np.sum(self.p) == 0:
+                self.initialize_p(agent_network)
+            # decide whether to self evaluate
+            self_eval = True if np.random.random() < self.self_eval_prob else False
+            # if self-evaluation then sample randomly from discovered goals
+            if self_eval:
+                b_ind = np.random.choice(agent_network.active_buckets)
+            # if no self evaluation
+            else:
+                b_ind = np.random.choice(range(self.num_buckets), p=self.p)
+            goal = random.choices(agent_network.buckets[b_ind])[0]
 
-    def update(self, episodes, t):
+            return goal, self_eval
+
+    def initialize_p(self, agent_network):
         """
-        Update discovered goals list from episodes
-        Update list of successes and failures for LP curriculum
-        Label each episode with the last ag (for buffer storage)
+        Initializes probabilities once at least one bucket is created
         """
-        all_episodes = MPI.COMM_WORLD.gather(episodes, root=0)
+        for k in agent_network.active_buckets:
+            self.p[k] = 1
+        self.p = self.p / len(agent_network.active_buckets)
 
-        if self.rank == 0:
-            all_episode_list = [e for eps in all_episodes for e in eps]
+    def update_lp(self, agent_network):
+        # compute C, LP per bucket
+        for k in agent_network.active_buckets:
+            n_points = len(agent_network.successes_and_failures[k])
+            if n_points > 70: # 70
+                n_points = min(n_points, self.queue_len)
+                sf = np.array(agent_network.successes_and_failures[k])
+                self.C[k] = np.mean(sf[n_points // 2:])
+                self.LP[k] = np.abs(np.sum(sf[n_points // 2:]) - np.sum(sf[: n_points // 2])) / n_points
+            else:
+                self.C[k] = 0
+                self.LP[k] = 0
 
-            for e in all_episode_list:
-                # Add last achieved goal to memory if first time encountered
-                if str(e['ag'][-1]) not in self.discovered_goals_str:
-                    self.discovered_goals.append(e['ag'][-1].copy())
-                    self.discovered_goals_str.append(str(e['ag'][-1]))
+        # compute p
+        if np.sum(self.LP) == 0:
+            self.initialize_p(agent_network)
+        else:
+            self.p = self.LP / self.LP.sum()
 
-        self.sync()
-
-        return episodes
+        if self.p.sum() > 1:
+            self.p[np.argmax(self.p)] -= self.p.sum() - 1
+        elif self.p.sum() < 1:
+            self.p[-1] = 1 - self.p[:-1].sum()
 
     def sync(self):
-        self.discovered_goals = MPI.COMM_WORLD.bcast(self.discovered_goals, root=0)
-        self.discovered_goals_str = MPI.COMM_WORLD.bcast(self.discovered_goals_str, root=0)
+        self.p = MPI.COMM_WORLD.bcast(self.p, root=0)
+        self.LP = MPI.COMM_WORLD.bcast(self.LP, root=0)
+        self.C = MPI.COMM_WORLD.bcast(self.C, root=0)
 
     def build_batch(self, batch_size):
         goal_ids = np.random.choice(np.arange(len(self.discovered_goals)), size=batch_size)
@@ -73,15 +93,14 @@ class GoalSampler:
 
     def init_stats(self):
         self.stats = dict()
-        # Number of classes of eval
-        if self.goal_dim == 30:
-            n = 11
-        else:
-            n = 6
-        for i in np.arange(1, n+1):
+        for i in np.arange(1, self.num_buckets+1):
             self.stats['Eval_SR_{}'.format(i)] = []
             self.stats['# class_teacher {}'.format(i)] = []
             self.stats['# class_agent {}'.format(i)] = []
+        for i in range(self.num_buckets):
+            self.stats['B_{}_LP'.format(i+1)] = []
+            self.stats['B_{}_C'.format(i+1)] = []
+            self.stats['B_{}_p'.format(i+1)] = []
         self.stats['epoch'] = []
         self.stats['episodes'] = []
         self.stats['global_sr'] = []
@@ -108,3 +127,8 @@ class GoalSampler:
         for k in goals_per_class.keys():
             self.stats['# class_teacher {}'.format(k)].append(goals_per_class[k])
             self.stats['# class_agent {}'.format(k)].append(agent_stats[k])
+
+        for i in range(self.num_buckets):
+            self.stats['B_{}_LP'.format(i+1)].append(self.LP[i])
+            self.stats['B_{}_C'.format(i+1)].append(self.C[i])
+            self.stats['B_{}_p'.format(i+1)].append(self.p[i])

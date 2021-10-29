@@ -14,6 +14,13 @@ class AgentNetwork():
         self.rank = MPI.COMM_WORLD.Get_rank()
         self.exp_path = exp_path
 
+        # initialize empty buckets, the last one contains all
+        self.num_buckets = 11
+        # Keeps track of which buckets contain goals
+        self.active_buckets = []
+        self.buckets = dict()
+        self.successes_and_failures = dict()
+
         self.init_stats()
         
     def update(self,episodes):
@@ -34,11 +41,21 @@ class AgentNetwork():
                 goal = tuple(e['g'][-1])
                 success = e['success'][-1]
 
-                # update agent count stats
+                # update agent buckets and count stats
                 try:
                     c = self.teacher.config_to_class[str(np.array(achieved_goal).reshape(1, -1))]
                     if self.stats[c+1] < 10000: # avoid float limit instabilities
                         self.stats[c+1] += 1
+                    if achieved_goal not in self.semantic_graph.configs:
+                        # Incremental creation of buckets and track successes and failures
+                        try:
+                            self.buckets[c].append(achieved_goal)
+                        except KeyError:
+                            self.buckets[c] = [achieved_goal]
+                            self.successes_and_failures[c] = []
+                            self.active_buckets.append(c)
+                    if e['self_eval']:
+                        self.successes_and_failures[c].append(success)
                 except KeyError:
                     pass
 
