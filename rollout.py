@@ -319,7 +319,7 @@ class HMERolloutWorker(RolloutWorker):
             self.reset()
         if len(agent_network.semantic_graph.configs) > 0:
             self.goal_sampler.update_lp(agent_network)
-            self.goal_sampler.sync()
+            # self.goal_sampler.sync()
         return all_episodes
 
     def internalize_social_episodes(self, agent_network, time_dict):
