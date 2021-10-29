@@ -61,9 +61,8 @@ class GoalSampler:
     def update_lp(self, agent_network):
         # compute C, LP per bucket
         for k in agent_network.active_buckets:
-            n_points = len(agent_network.successes_and_failures[k])
+            n_points = min(len(agent_network.successes_and_failures[k]), self.queue_len)
             if n_points > 70: # 70
-                n_points = min(n_points, self.queue_len)
                 sf = np.array(agent_network.successes_and_failures[k])
                 self.C[k] = np.mean(sf[n_points // 2:])
                 self.LP[k] = np.abs(np.sum(sf[n_points // 2:]) - np.sum(sf[: n_points // 2])) / n_points
