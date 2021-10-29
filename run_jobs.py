@@ -16,16 +16,16 @@ mkdir_p(job_directory)
 nb_seeds = 10
 
 for i in range(nb_seeds):
-    job_file = os.path.join(job_directory, "value_disagreement_%.slurm")
+    job_file = os.path.join(job_directory, "learning_progress_%.slurm")
 
     with open(job_file, 'w') as fh:
         fh.writelines("#!/bin/bash\n")
         fh.writelines("#SBATCH --account=oke@cpu\n")
-        fh.writelines("#SBATCH --job-name=vd_baseline_{}\n".format(i))
+        fh.writelines("#SBATCH --job-name=lp_baseline_{}\n".format(i))
         fh.writelines("#SBATCH --partition=cpu_p1\n")
         fh.writelines("#SBATCH --qos=qos_cpu-t4\n")
-        fh.writelines("#SBATCH --output=vd_baseline_{}%_%j.out\n".format(i))
-        fh.writelines("#SBATCH --error=vd_baseline_{}%_%j.out\n".format(i))
+        fh.writelines("#SBATCH --output=lp_baseline_{}%_%j.out\n".format(i))
+        fh.writelines("#SBATCH --error=lp_baseline_{}%_%j.out\n".format(i))
         fh.writelines("#SBATCH --time=40:00:00\n")
         fh.writelines("#SBATCH --nodes=1\n")
         fh.writelines("#SBATCH --ntasks=24\n")
