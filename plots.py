@@ -11,7 +11,7 @@ def get_cmap(n, name='tab20'):
     RGB color; the keyword argument name must be a standard mpl colormap name."""
     return plt.cm.get_cmap(name, n)
 
-font = {'size': 40}
+font = {'size': 80}
 matplotlib.rc('font', **font)
 matplotlib.rcParams['pdf.fonttype'] = 42
 matplotlib.rcParams['ps.fonttype'] = 42
@@ -20,7 +20,7 @@ plt.rcParams['figure.constrained_layout.use'] = True
 RESULTS_PATH = '/home/ahmed/Documents/ICLR2022/studies/'
 STUDY = 'rebuttal'
 SAVE_PATH = '/home/ahmed/Documents/ICLR2022/studies/plots/' + STUDY + '/'
-TO_PLOT = ['speed']
+TO_PLOT = ['learning_trajectory']
 
 NB_CLASSES = 11
 
@@ -29,26 +29,26 @@ ERR = 'std'
 DPI = 30
 N_SEEDS = None
 N_EPOCHS = None
-LINEWIDTH = 7
-MARKERSIZE = 10
+LINEWIDTH = 10
+MARKERSIZE = 20
 ALPHA = 0.3
 ALPHA_TEST = 0.05
 MARKERS = ['o', 'v', 's', 'P', 'D', 'X', "*", 'v', 's', 'p', 'P', '1']
-FREQ = 5
+FREQ = 10
 NB_CYCLES_PER_EPOCH = 1200
-LAST_EP = 220
+LAST_EP = 240
 LIM = NB_CYCLES_PER_EPOCH * LAST_EP / 1000 + 2
 line, err_min, err_plus = get_stat_func(line=LINE, err=ERR)
 COMPRESSOR = CompressPDF(4)
 
 def setup_figure(xlabel=None, ylabel=None, xlim=None, ylim=None):
-    fig = plt.figure(figsize=(29, 20), frameon=False)
+    fig = plt.figure(figsize=(36, 25), frameon=False)
     ax = fig.add_subplot(111)
     ax.spines['top'].set_linewidth(6)
     ax.spines['right'].set_linewidth(6)
     ax.spines['bottom'].set_linewidth(6)
     ax.spines['left'].set_linewidth(6)
-    ax.tick_params(width=10, direction='in', length=20, labelsize='40')
+    ax.tick_params(width=10, direction='in', length=20, labelsize='60')
     artists = ()
     if xlabel:
         xlab = plt.xlabel(xlabel)
@@ -64,7 +64,7 @@ def setup_figure(xlabel=None, ylabel=None, xlim=None, ylim=None):
 
 def setup_n_figs(n, m, xlabels=None, ylabels=None, xlims=None, ylims=None):
     # fig, axs = plt.subplots(2, 3, figsize=(25, 10), frameon=False)
-    fig, axs = plt.subplots(n, m, figsize=(24,6*m), frameon=False)
+    fig, axs = plt.subplots(n, m, figsize=(36*n,6*m), frameon=False)
     axs = axs.ravel()
     # fig = plt.figure(figsize=(22, 7))
     # axs = np.array([plt.subplot(141, gridspec_kw={'width_ratios': [3, 1]}), plt.subplot(142, gridspec_kw={'width_ratios': [3, 1]}),
@@ -76,7 +76,7 @@ def setup_n_figs(n, m, xlabels=None, ylabels=None, xlims=None, ylims=None):
         ax.spines['right'].set_linewidth(3)
         ax.spines['bottom'].set_linewidth(3)
         ax.spines['left'].set_linewidth(3)
-        ax.tick_params(width=5, direction='in', length=15, labelsize='20', zorder=10)
+        ax.tick_params(width=5, direction='in', length=15, labelsize='40', zorder=10)
         if xlabels[i_ax]:
             xlab = ax.set_xlabel(xlabels[i_ax])
             artists += (xlab,)
@@ -165,11 +165,11 @@ def plot_classes(experiment_path, n_seeds=1):
     #  'Stack 5']
     leg = fig.legend(['Stack 3', 'Stacks 2&2', 'Stack 2&3', 'Pyramid&Stack2', 'Stack 4', 'Stack 5'],
                      loc='upper center',
-                     bbox_to_anchor=(0.5, 1.1),
-                     ncol=6,
+                     bbox_to_anchor=(0.5, 1.15),
+                     ncol=3,
                      fancybox=True,
                      shadow=True,
-                     prop={'size': 20, 'weight': 'bold'},
+                     prop={'size': 60, 'weight': 'bold'},
                      markerscale=1)
     artists += (leg,)
     plt.savefig(SAVE_PATH + '/goals_classes.pdf', bbox_inches='tight')
@@ -178,28 +178,37 @@ def plot_classes(experiment_path, n_seeds=1):
 def plot_counts_and_sr(experiment_path, conditions):
     # conditions = os.listdir(experiment_path)
     # titles = ['Close 3', 'Stack 2', 'Stack 3', 'Stack 2 & 2', 'Stack 2 & 3', 'Pyramid', 'Pyr 3 & Stack 2', 'Stack 4', 'Stack 5']
-    titles = ['Stack 3', 'Stack 2 & 2', 'Stack 2 & 3', 'Pyr 3 & Stack 2', 'Stack 4', 'Stack 5']
-    classes = [5, 6, 7, 9, 10, 11]
+    # titles = ['Stack 3', 'Stack 2 & 2', 'Stack 2 & 3', 'Pyr 3 & Stack 2', 'Stack 4', 'Stack 5']
+    titles = ['Stack 2 & 2', 'Pyr 3 & Stack 2', 'Stack 4', 'Stack 5']
+    # classes = [5, 6, 7, 9, 10, 11]
+    classes = [6, 9, 10, 11]
     # titles = ['Stack 3', 'Stack 2 & 2', 'Pyr 3 & Stack 2']
     # classes = [5, 6, 9]
     colors = get_cmap(9, name='tab10')
-    for cond in conditions:
+    artists, axs, fig = setup_n_figs(n=2,
+                                     m=4,
+                                     xlabels=[None] * 4 + ['Cycles (x$10^3$)', 'Cycles (x$10^3$)', 'Cycles (x$10^3$)', 'Cycles (x$10^3$)'],
+                                     ylabels=['SP 0.0% \n \n Goal Counts', None, None, None] + ['SP 0.2% \n\n Goal Counts', None, None, None] ,
+                                     xlims=[(0, LIM)] * 8,
+                                     ylims=[(0, 10), (0, 10), (0, 20), (0, 30),
+                                            (0, 10), (0, 10), (0, 20), (0, 30)])
+    for k, cond in enumerate(conditions):
         cond_path = experiment_path + cond + '/'
         list_runs = sorted(os.listdir(cond_path))
         # for run in list_runs:
-        run = list_runs[2]
+        run = list_runs[3] if cond == 'SP_0.0%' else list_runs[1]
         print(run)
         # try:
         run_path = cond_path + run + '/'
         data_run = pd.read_csv(run_path + 'progress.csv')
         x_eps = np.arange(0, (LAST_EP + 1) * NB_CYCLES_PER_EPOCH, NB_CYCLES_PER_EPOCH * FREQ) / 1000
         x = np.arange(0, LAST_EP + 1, FREQ)
-        artists, axs, fig = setup_n_figs(n=3,
-                                         m=2,
-                                    xlabels=[None, None, None] * 1 + ['Cycles (x$10^3$)', 'Cycles (x$10^3$)','Cycles (x$10^3$)'],
-                                    ylabels=['SP goals', None, None] * 2,
-                                    xlims=[(0, LIM)] * 6,
-                                    ylims=[(0, 20), (0, 10), (0, 10), (0, 10), (0, 20), (0, 30)])
+        # artists, axs, fig = setup_n_figs(n=1,
+        #                                  m=6,
+        #                             xlabels=[None, None] * 2 + ['Cycles (x$10^3$)', 'Cycles (x$10^3$)'],
+        #                             ylabels=['SP goals', None] * 3,
+        #                             xlims=[(0, LIM)] * 6,
+        #                             ylims=[(0, 20), (0, 10), (0, 10), (0, 10), (0, 20), (0, 30)])
         # artists, axs, fig = setup_n_figs(n=3,
         #                                  m=1,
         #                                  xlabels=[None, None, 'Cycles (x$10^3$)'],
@@ -207,42 +216,44 @@ def plot_counts_and_sr(experiment_path, conditions):
         #                                  xlims=[(0, LIM)] * 3,
         #                                  ylims=[(0, 20), (0, 10), (0, 10)])
         for i, c in enumerate(classes):
-            l1 = axs[i].plot(x_eps, data_run['# class_teacher {}'.format(c)][x], color=colors(0), marker=MARKERS[c], markersize=MARKERSIZE, linewidth=LINEWIDTH,
+            l1 = axs[4*k + i].plot(x_eps, data_run['# class_teacher {}'.format(c)][x], color=colors(0), marker=MARKERS[c], markersize=MARKERSIZE, linewidth=LINEWIDTH,
                         linestyle='dashed')
-            l2= axs[i].plot(x_eps, data_run['# class_agent {}'.format(c)][x], color=colors(0), marker=MARKERS[c], markersize=MARKERSIZE, linewidth=LINEWIDTH,
+            l2= axs[4*k + i].plot(x_eps, data_run['# class_agent {}'.format(c)][x], color=colors(0), marker=MARKERS[c], markersize=MARKERSIZE, linewidth=LINEWIDTH,
                         linestyle='dotted')
-            axs[i].grid()
-            ax2 = axs[i].twinx()
-            l3 = ax2.plot(x_eps, data_run['Eval_SR_{}'.format(c)][x], color=colors(0), marker=MARKERS[c], markersize=MARKERSIZE, linewidth=LINEWIDTH)
-            if (i+1) % 3 == 0:
-                ax2.set_ylabel("Success Rate")
+            # axs[4*k + i].grid()
+            ax2 = axs[4*k + i].twinx()
+            l3 = ax2.plot(x_eps, data_run['Eval_SR_{}'.format(c)][x], color=colors(0), marker=MARKERS[c], markersize=MARKERSIZE, linewidth=LINEWIDTH,
+                          linestyle='solid')
+            if (i+1) % 4 == 0:
+                ax2.set_ylabel("SR")
             ax2.set_ylim(-0.01, 1.01)
-            axs[i].set_title(titles[i], fontweight='bold')
+            axs[i].set_title(titles[i])
 
         # l = l1 + l2 + l3
-        leg = fig.legend(['# SP suggestions', '# reached configurations', 'Success Rate'],
-                         loc='upper center',
-                         bbox_to_anchor=(0.5, 1.1),
-                         ncol=3,
-                         fancybox=True,
-                         shadow=True,
-                         prop={'size': 20, 'weight': 'bold'},
-                         markerscale=1)
-        artists += (leg,)
+            if k == 0 and i ==0:
+                leg = fig.legend(['# SP suggestions', '# reached configurations', 'Success Rate'],
+                                 loc='upper center',
+                                 bbox_to_anchor=(0.5, 1.15),
+                                 ncol=3,
+                                 fancybox=True,
+                                 shadow=True,
+                                 prop={'size': 100, 'weight': 'bold'},
+                                 markerscale=1)
+                artists += (leg,)
         # ax.grid()
         # plt.show()
         # save_fig(path=run_path + 'goals_{}.pdf'.format(cond), artists=artists)
         # except:
         #     print('failed')
-        plt.savefig(SAVE_PATH + '/goals_sr.pdf'.format(i), bbox_inches='tight')
-        plt.close('all')
+    plt.savefig(SAVE_PATH + '/goals_sr.pdf'.format(i), bbox_inches='tight')
+    plt.close('all')
 
 def plot_stepping_stones(experiment_path, max_len, max_seeds, conditions=None, labels=None):
     if conditions is None:
         conditions = os.listdir(experiment_path)
     st = np.zeros([max_seeds, len(conditions), LAST_EP + 1 ])
     st.fill(np.nan)
-    colors = get_cmap(3*len(conditions))
+    colors = get_cmap(9, name='Dark2')
     for i_cond, cond in enumerate(conditions):
         cond_path = experiment_path + cond + '/'
         list_runs = sorted(os.listdir(cond_path))
@@ -268,18 +279,18 @@ def plot_stepping_stones(experiment_path, max_len, max_seeds, conditions=None, l
                                ylim=[-0.02, 8100])
 
     for i in range(len(conditions)):
-        plt.plot(x_eps, st_per_cond_stats[i, x, 0], color=colors(3*i), marker=MARKERS[i], markersize=MARKERSIZE, linewidth=LINEWIDTH)
-        plt.fill_between(x_eps, st_per_cond_stats[i, x, 1], st_per_cond_stats[i, x, 2], color=colors(3*i), alpha=ALPHA)
+        plt.plot(x_eps, st_per_cond_stats[i, x, 0], color=colors(i), marker=MARKERS[i], markersize=MARKERSIZE, linewidth=LINEWIDTH)
+        plt.fill_between(x_eps, st_per_cond_stats[i, x, 1], st_per_cond_stats[i, x, 2], color=colors(i), alpha=ALPHA)
 
     if labels is None:
         labels = conditions
     leg = plt.legend(labels,
                      loc='upper center',
-                     bbox_to_anchor=(0.5, 1.1),
+                     bbox_to_anchor=(0.5, 1.2),
                      ncol=4,
                      fancybox=True,
                      shadow=True,
-                     prop={'size': 40, 'weight': 'bold'},
+                     prop={'size': 80, 'weight': 'bold'},
                      markerscale=1,
                      )
     for l in leg.get_lines():
@@ -354,9 +365,11 @@ def get_mean_sr(experiment_path, max_len, max_seeds):
     while ref not in conditions:
         print('Reference agent not recognized, please enter an agent within {}'.format(conditions))
         ref = input('Enter reference agent: ')
+    # conditions = conditions[:4] + [conditions[-1], conditions[-2], conditions[-3]]
+    # labels = labels[:4] + [labels[-1], labels[-2], labels[-3]]
     sr = np.zeros([max_seeds, len(conditions), LAST_EP + 1 ])
     sr.fill(np.nan)
-    colors = get_cmap(9, name='Set1')
+    colors = get_cmap(9, name='Dark2')
     for i_cond, cond in enumerate(conditions):
         if cond == ref:
             ref_id = i_cond
@@ -410,10 +423,10 @@ def get_mean_sr(experiment_path, max_len, max_seeds):
     leg = plt.legend(labels,
                      loc='upper center',
                      bbox_to_anchor=(0.47, 1.1),
-                     ncol=7,
+                     ncol=4,
                      fancybox=True,
                      shadow=True,
-                     prop={'size': 30, 'weight': 'bold'},
+                     prop={'size': 60, 'weight': 'bold'},
                      markerscale=1,
                      )
     for l in leg.get_lines():
@@ -453,11 +466,13 @@ if __name__ == '__main__':
             labels = ['SP 20% Beyond', 'SP 20% Frontier and Beyond']
             get_mean_sr(experiment_path, max_len, max_seeds, conditions, labels, ref='Beyond')
         elif PLOT == 'learning_trajectory':
-            conditions = ['SP_0.0%']
+            conditions = ['SP_0.0%', 'SP_0.2%']
             plot_counts_and_sr(experiment_path, conditions)
         elif PLOT == 'stepping_stones':
-            conditions = ['SP_0.2%', 'SP_0.0%']
-            labels = ['SP_0.2%', 'SP_0.0%']
+            # conditions = ['SP_5%', 'SP_0.5%', 'SP_0.2%', 'SP_0.1%']
+            # labels = ['SP-5%', 'SP-0.5%', 'SP-0.2%', 'SP-0.1%']
+            conditions = ['SP 20%', 'x_no_internalization']
+            labels = ['SP-20%', 'SP-20%-NI']
             plot_stepping_stones(experiment_path, max_len, max_seeds, conditions, labels)
 
         elif PLOT == 'speed':
