@@ -18,6 +18,7 @@ def hard_update(target, source):
 
 class RLAgent:
     def __init__(self, args, compute_rew):
+        self.device = torch.device('cuda' if torch.cuda.is_available() else 'cpu')
         self.args = args
         self.alpha = args.alpha
         self.env_params = args.env_params
@@ -54,10 +55,10 @@ class RLAgent:
         self.g_norm = normalizer(size=self.env_params['goal'], default_clip_range=self.args.clip_range)
 
         # if use GPU
-        if self.args.cuda:
-            self.model.critic.cuda()
-            self.model.actor.cuda()
-            self.model.critic_target.cuda()
+        # if self.args.cuda:
+        self.model.critic.to(self.device)
+        self.model.actor.to(self.device)
+        self.model.critic_target.to(self.device)
 
         # Target Entropy
         self.target_entropy = -torch.prod(torch.Tensor(self.env_params['action'])).item()
@@ -82,6 +83,10 @@ class RLAgent:
             g_norm = torch.tensor(self.g_norm.normalize(g), dtype=torch.float32).unsqueeze(0)
 
             obs_tensor = torch.tensor(obs_norm, dtype=torch.float32).unsqueeze(0)
+            # Pass to device
+            ag_norm = ag_norm.to(self.device)
+            g_norm = g_norm.to(self.device)
+            obs_tensor = obs_tensor.to(self.device)
             self.model.policy_forward_pass(obs_tensor, ag_norm, g_norm, no_noise=no_noise)
             action = self.model.pi_tensor.numpy()[0]
 
@@ -175,7 +180,7 @@ class RLAgent:
 
         self.alpha = update_networks(self.model, self.policy_optim, self.critic_optim, self.alpha, self.log_alpha,
                                      self.target_entropy, self.alpha_optim, obs_norm, ag_norm, g_norm, obs_next_norm, ag_next_norm,
-                                     actions, rewards, self.args)
+                                     actions, rewards, self.args, self.device)
 
     def save(self, model_path, epoch):
         # Store model

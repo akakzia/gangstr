@@ -20,7 +20,7 @@ def update_entropy(alpha, log_alpha, target_entropy, log_pi, alpha_optim, args):
     return alpha, alpha_loss, alpha_tlogs
 
 def update_networks(model, policy_optim, critic_optim, alpha, log_alpha, target_entropy, alpha_optim, obs_norm, ag_norm, g_norm,
-                    obs_next_norm, ag_next_norm, actions, rewards, args):
+                    obs_next_norm, ag_next_norm, actions, rewards, args, device):
     # Tensorize
     obs_norm_tensor = torch.tensor(obs_norm, dtype=torch.float32)
     obs_next_norm_tensor = torch.tensor(obs_next_norm, dtype=torch.float32)
@@ -31,14 +31,14 @@ def update_networks(model, policy_optim, critic_optim, alpha, log_alpha, target_
     actions_tensor = torch.tensor(actions, dtype=torch.float32)
     r_tensor = torch.tensor(rewards, dtype=torch.float32).reshape(rewards.shape[0], 1)
 
-    if args.cuda:
-        obs_norm_tensor = obs_norm_tensor.cuda()
-        obs_next_norm_tensor = obs_next_norm_tensor.cuda()
-        g_norm_tensor = g_norm_tensor.cuda()
-        ag_norm_tensor = ag_norm_tensor.cuda()
-        ag_next_norm_tensor = ag_next_norm_tensor.cuda()
-        actions_tensor = actions_tensor.cuda()
-        r_tensor = r_tensor.cuda()
+    # if args.cuda:
+    obs_norm_tensor = obs_norm_tensor.to(device)
+    obs_next_norm_tensor = obs_next_norm_tensor.to(device)
+    g_norm_tensor = g_norm_tensor.to(device)
+    ag_norm_tensor = ag_norm_tensor.to(device)
+    ag_next_norm_tensor = ag_next_norm_tensor.to(device)
+    actions_tensor = actions_tensor.to(device)
+    r_tensor = r_tensor.to(device)
 
     with torch.no_grad():
         model.forward_pass(obs_next_norm_tensor, ag_next_norm_tensor, g_norm_tensor)
