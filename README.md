@@ -1,5 +1,5 @@
 # Help Me Explore: Minimal Social Interventions for Graph-Based Autotelic Agents
-_This repository contains the code associated to the Help Me Explore: Minimal Social Interventions for Graph-Based Autotelic Agents paper submitted at the ICLR 2022 conference._
+_This repository contains the code associated to the Help Me Explore: Minimal Social Interventions for Graph-Based Autotelic Agents paper submitted at the ICML 2022 conference._
 
 **Abstract.**
 In the quest for autonomous agents learning open-ended repertoires of skills, most works take a Piagetian perspective: learning trajectories are the results of 
